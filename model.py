@@ -78,8 +78,8 @@ class Model(object):
             self.model_path = self.base_folder_name + "/model.vw"
             self.cache_path = self.base_folder_name + "/temp.cache"
             #self.f1 = open(self.base_folder_name + "/train.vw", 'a')
-            self.model = pyvw.vw(quiet=True, l2=0.00000001, loss_function='squared', passes=1, holdout_off=True, cache=self.cache_path,
-                                 f=self.model_path,  lrq='sdsd7')
+            self.model = pyvw.vw(quiet=True, l2=0.000000001, loss_function='squared', passes=1, holdout_off=True, cache=self.cache_path,
+                                 f=self.model_path,  lrq='sdsd14', b=20)
 
     def remove_vw_files(self):
         if os.path.isfile(self.cache_path): os.remove(self.cache_path)

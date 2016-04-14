@@ -38,7 +38,7 @@ class GridWorld(game.AbstractGame):
                 self.all_used_coordinates['y'].add(ya)
                 return xa, ya
 
-    def initiate_game(self):
+    def initiate_game(self, full_rnd=True):
         """
         What exactly we know about the game beforehand?
          - all possible actions we can take
@@ -47,20 +47,28 @@ class GridWorld(game.AbstractGame):
          - so our design matrix should only be set of pixels (or image representation) AND decision taken
          - all we know is : there are 4 things on the screen.. lets use sparse representation
         """
-        # TODO Randomize
-        # x, y = 0,2
-        # self.player_info = self.coordinates(x, y)
-        # x, y = 1,3
-        # self.wall_info = self.coordinates(x, y)
-        # x, y = 2,3
-        # self.pit_info = self.coordinates(x, y)
-        # x, y = 3,3
-        # self.win_info = self.coordinates(x, y)
-        random_coors = [self.coordinates(i,j) for i,j in zip(random.sample(xrange(0,4), 4), [random.randint(0,3) for _ in xrange(0, 4)])]
-        self.player_info, self.wall_info, self.pit_info, self.win_info = random_coors
+        if full_rnd:
+            random_coors = [self.coordinates(i,j) for i,j in zip(random.sample(xrange(0,4), 4), [random.randint(0,3) for _ in xrange(0, 4)])]
+            self.player_info, self.wall_info, self.pit_info, self.win_info = random_coors
+
+        # Else generate only player and win randomly
+        else:
+            x1, y1 = 1,3
+            self.wall_info = self.coordinates(x1, y1)
+            x2, y2 = 2,3
+            self.pit_info = self.coordinates(x2, y2)
+
+            x3, y3 = (random.randint(0,3), random.randint(0,3))
+            while (x1, y1) == (x3, y3):
+                x3, y3 = (random.randint(0,3), random.randint(0,3))
+            self.player_info = self.coordinates(x3, y3)
+
+            x4, y4 = (random.randint(0,3), random.randint(0,3))
+            while (x2, y2) == (x4, y4):
+                x4, y4 = (random.randint(0,3), random.randint(0,3))
+            self.win_info = self.coordinates(x4, y4)
+
         game_state = (self.player_info, self.wall_info, self.pit_info, self.win_info)
-        # info = flatten_list_of_lists(game_state)
-        # self.state = self.state_info(*info)
         self.state = game_state
         self.game_status = 'in process'
 
