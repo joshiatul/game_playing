@@ -295,17 +295,14 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
 # ---------------------------------------------------------------------------------------------------
 
 # TODO Compare with random actions
-def test_policy(game_obs, model=None):
+def test_policy_with_random_play(game_obs, model=None):
     print "---------- Testing policy:-----------"
     banditAlgorithm = BanditAlgorithm(params=0.1)
     game_obs.initiate_game()
     print "Initial state:"
     print game_obs.state
-    #game_obs.display_grid() - only for gridworld
-    move = 1
 
     random_stat = Counter()
-    move = 1
     mv = 1
     for _ in xrange(100):
         game_obs.initiate_game()
@@ -336,18 +333,12 @@ def test_policy(game_obs, model=None):
         while game_obs.game_status == 'in process':
             new_qval_table = banditAlgorithm.return_decision_reward_tuples(game_obs.state, model)
             best_action, value_estimate = banditAlgorithm.return_decision_with_max_reward(new_qval_table)
-            #print('Move #: %s; Taking action: %s' % (move, best_action))
             reward = game_obs.play(best_action)
-            #print game_obs.state
-            #game_obs.display_grid() - only for gridworld
             move += 1
             if move >= 50 and game_obs.game_status == 'in process':
-                #print "Too many moves"
                 model_stat['in process'] += 1
                 break
-        #
-        # if game_obs.game_status != 'in process':
-        #     print "Summary: " + game_obs.game_status + " :Player Reward: " + str(reward)
+
         if game_obs.game_status == 'player wins':
             model_stat['player wins'] += 1
         elif game_obs.game_status == 'player loses':

@@ -38,7 +38,7 @@ class GridWorld(game.AbstractGame):
                 self.all_used_coordinates['y'].add(ya)
                 return xa, ya
 
-    def initiate_game(self, full_rnd=True):
+    def initiate_game(self, full_rnd=False):
         """
         What exactly we know about the game beforehand?
          - all possible actions we can take
@@ -132,8 +132,8 @@ class GridWorld(game.AbstractGame):
             return -5
         else:
             # Return distance from win (player looks at screen so i think this is fare)
-            return -(math.sqrt((self.player_info.x - self.win_info.x)**2 + (self.player_info.y - self.win_info.y)**2))
-            #return -1
+            #return -(math.sqrt((self.player_info.x - self.win_info.x)**2 + (self.player_info.y - self.win_info.y)**2))
+            return -1
 
 
 if __name__ == "__main__":

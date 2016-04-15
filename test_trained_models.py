@@ -23,7 +23,7 @@ def test_training_monte_carlo_for_blackjack(model_class, epochs):
     # Add ipython notebook 3D ghaph
 
     # Test policy
-    rl.test_policy(blackjack, model)
+    rl.test_policy_with_random_play(blackjack, model)
 
     return policy, model
 
@@ -42,7 +42,7 @@ def test_training_TD_for_blackjack(model_class, epochs=5000):
     # Add ipython notebook 3D ghaph
 
     # Test policy
-    rl.test_policy(blackjack)
+    rl.test_policy_with_random_play(blackjack)
 
     return policy, model
 
@@ -51,7 +51,7 @@ def test_training_TD_for_gridworld(model_class, epochs, train=True):
     gridworld = GridWorld()
     if train:
         policy, model = rl.train_reinforcement_strategy_temporal_difference(epochs=epochs, game_obs=gridworld, model_class=model_class)
-    random_stat, model_stat = rl.test_policy(gridworld)
+    random_stat, model_stat = rl.test_policy_with_random_play(gridworld)
     return random_stat, model_stat
 
     # Record MSE for each epoch may be?
@@ -64,7 +64,7 @@ def test_training_TD_lambda_for_gridworld(model_class, epochs, train=True):
     gridworld = GridWorld()
     if train:
         policy, model = rl.train_reinforcement_strategy_temporal_difference_eligibility_trace(epochs=epochs, game_obs=gridworld, model_class=model_class)
-    rl.test_policy(gridworld)
+    rl.test_policy_with_random_play(gridworld)
 
 
 
