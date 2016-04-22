@@ -1,21 +1,15 @@
 from model import Model
 from bandits import BanditAlgorithm
-from games.blackjack.blackjack import BlackJack
-from games.gridworld.gridworld import GridWorld
-import pandas as pd
 import random
 import time
 import cPickle as pickle
-import numpy as np
-from collections import Counter
-
-
-# TODO : 2) Implement Q learning and SARSA
-# TODO:  3) Implement eligibility traces and see how gridworld works
+from collections import Counter, deque
 
 
 def learn_Q_function(all_observed_decision_states, reward, model):
-    # TODO We need to implement experience replay here instead of
+    """
+    Episodic learning (mostly for lookup table method) - helper method
+    """
     if model.model_class == 'lookup_table':
         model.fit(all_observed_decision_states, reward)
 
@@ -33,7 +27,11 @@ def learn_Q_function(all_observed_decision_states, reward, model):
 
     return model
 
+
 def train_reinforcement_learning_strategy(num_sims=1, game_obs='blackjack', model_class='lookup_table'):
+    """
+    Episodic learning (mostly for lookup table method)
+    """
     start_time = time.time()
     # Initialize model
     model = Model({'class': model_class, 'base_folder_name': game_obs.base_folder_name})
@@ -59,89 +57,102 @@ def train_reinforcement_learning_strategy(num_sims=1, game_obs='blackjack', mode
     return banditAlgorithm.policy, model
 
 
-def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackjack', model_class='lookup_table',algo='q_learning' ):
-    # Initialize model
-
+def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackjack', model_class='lookup_table', algo='q_learning'):
+    """
+    Temporal difference learning
+    """
     start_time = time.time()
 
     model = Model({'class': model_class, 'base_folder_name': game_obs.base_folder_name})
     model.initialize()
-    epsilon = 0.99
+    epsilon = 0.25
     banditAlgorithm = BanditAlgorithm(params=epsilon)
-    replay = []
-    buffer = 500
-    batchsize = 100
-    gamma = 0.9
-    h=0
-    steps = 1
+    memory_storage_limit = 20
+    memory_storage = deque(maxlen=memory_storage_limit)
+    batchsize = 10
+    gamma = 0.5 #### Seems very critical to tune this .. lower the better (0.1 works best for continuous reward)
+    steps = 1 # More than 1 steps doesn't work well.. why??
+    max_steps = 50
+    seen_initial_states = []
+    wins = 0
+    loss = 0
+    new_games = 0
 
-    model.all_possible_decisions = game_obs.all_possible_decisions
+    # model.all_possible_decisions = game_obs.all_possible_decisions
 
     for _ in xrange(epochs):
-        # Initialize game
+
+        # Initialize game and parameters for this epoch
         game_obs.initiate_game()
+        #TODO check what testing is doing
+        if game_obs.state not in set(seen_initial_states):
+            print "--------------------------------- new initial game"
+            new_games += 1
+        a = tuple([tuple(obs) for obs in game_obs.state])
+        seen_initial_states.append(a)
+        model.observed_initial_states = set(seen_initial_states)
+
         banditAlgorithm.params = epsilon
         move = 0
+        print 'Game #: {0}'.format(_)
+        print a
 
-        print("Game #: %s" % (_,))
+        # Start playing the game
+        for move in xrange(max_steps):
 
-        # TODO This assumes we have a dumb model when we initialize
-        while game_obs.game_status == 'in process':
-            move += 1
-
-            # Let's start new game if after 10 moves game doesn't end
-            if move > 50:
+            # Check game status and breakout if already you have a result
+            if game_obs.game_status != 'in process':
                 break
 
             model.buffer += 1
+
+            # Store current game state
             old_state = game_obs.state
 
-            # TODO Finish implement q value update using Bellman equation
-            best_known_decision, known_reward = banditAlgorithm.select_decision_given_state(game_obs.state, model,
-                                                                                            algorithm='epsilon-greedy')
-            # Play or make move to get to a new state and see reward
+            # Figure out best action based on policy
+            best_known_decision, known_reward = banditAlgorithm.select_decision_given_state(game_obs.state, game_obs.all_possible_decisions, model, algorithm='epsilon-greedy')
+            # Make move to get to a new state and observe reward (Remember this could be a terminal state)
             reward = game_obs.play(best_known_decision)
             new_state = game_obs.state
 
-            #Experience replay storage
-            if (len(replay) < buffer): #if buffer not filled, add to it
-                replay.append((old_state, best_known_decision, reward, new_state))
+            # Experience replay storage (deque object maintains a queue, so no extra processing needed)
+            # If buffer is full, it gets overwritten due to deque magic
+            memory_storage.appendleft((old_state, best_known_decision, reward, new_state))
 
-            # We do not train until buffer is full, but after that we train with every single epoch
-            else: #if buffer full, overwrite old values
-                if (h < (buffer-1)):
-                    h += 1
-                else:
-                    h = 0
-                replay[h] = (old_state, best_known_decision, reward, new_state)
+            # If buffer not filled, continue and collect sample to train
+            if (len(memory_storage) < memory_storage_limit):
+                continue
 
-                #randomly sample our experience replay memory
-                # TODO We don't need batchsize for vw, we can just replay the whole memory may be
-                minibatch = random.sample(replay, batchsize)
+            # Start training only after buffer is full
+            else:
 
+                # randomly sample our experience replay memory
+                minibatch = random.sample(memory_storage, batchsize)
+
+                # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
                 for memory in minibatch:
 
                     old_state_er, action_er, reward_er, new_state_er = memory
 
-                    for step in xrange(1, steps+1):
-                        # TODO This flow is incorrect as well, for different. We should not worry about game status here
-                        if game_obs.game_status == 'in process' and model.exists: #non-terminal state
-                            # Get q values for the new state, and then choose best action (a single step temporal difference q learning)
+                    # How far in the future you want to go?
+                    for step in xrange(1, steps + 1):
+
+                        # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
+                        if game_obs.game_status == 'in process' and model.exists:  # non-terminal state
                             # Get value estimate for that best action and update EXISTING reward
                             # TODO: Bug here? I think the returned action needs to be played to observe the reward
-                            # TODO Instead i am getting the reward "estimate" based on the model
+                            #TODO Instead i am getting the reward "estimate" based on the model
                             if algo == 'q_learning':
-                                result = banditAlgorithm.return_action_based_on_greedy_policy(new_state_er, model)
-                                # max_reward = result[1]
-                                # TODO BAAM i think this is the correct WAY!!!!!
-                                max_reward = game_obs.play(result[0])
+                                result = banditAlgorithm.return_action_based_on_greedy_policy(new_state_er, model, game_obs.all_possible_decisions)
+                                max_reward = result[1]
+                                #TODO BAAM i think this is the correct WAY!!!!!
+                                #max_reward = game_obs.play(result[0])
                             elif algo == 'sarsa':
-                                result = banditAlgorithm.select_decision_given_state(new_state_er, model,
-                                                                                                algorithm='epsilon-greedy')
+                                result = banditAlgorithm.select_decision_given_state(new_state_er, game_obs.all_possible_decisions, model, algorithm='epsilon-greedy')
                                 max_reward = game_obs.play(result[0])
 
                             if result:
-                                reward_er += (gamma**step) * max_reward
+                                reward_er += (gamma ** step) * max_reward
 
                     X_new, y_new = model.return_design_matrix((old_state_er, action_er), reward_er)
 
@@ -158,19 +169,23 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
                     # TODO Instead of killing entire buffer we can keep a few and kill only the subset
                     model.clean_buffer()
 
-            # TODO Check for terminal state
+                    # TODO Check for terminal state
         print game_obs.game_status + " in " + str(move) + " moves"
+        if game_obs.game_status == 'player wins': wins += 1
+        if game_obs.game_status == 'player loses': loss += 1
         if epsilon > 0.1:  # decrement epsilon over time
             epsilon -= (1.0 / epochs)
 
     model.finish()
     elapsed_time = int(time.time() - start_time)
     print ": took time:" + str(elapsed_time)
+    print ": total wins:" + str(wins)
+    print ": total losses:" + str(loss)
+    print ": unique games:" + str(new_games)
 
     return banditAlgorithm.policy, model
 
 
-# TODO Compare with random actions
 def test_policy_with_random_play(game_obs, model=None):
     print "---------- Testing policy:-----------"
     banditAlgorithm = BanditAlgorithm(params=0.1)
@@ -194,7 +209,6 @@ def test_policy_with_random_play(game_obs, model=None):
         elif game_obs.game_status == 'player loses':
             random_stat['player loses'] += 1
 
-
     # Unpickle if model obs not provided
     if not model:
         model = pickle.load(open(game_obs.base_folder_name + '/model_obs.pkl', mode='rb'))
@@ -203,11 +217,13 @@ def test_policy_with_random_play(game_obs, model=None):
         model.model = pyvw.vw("--quiet -i {0}".format(model.model_path))
 
     model_stat = Counter()
-    move = 1
     for _ in xrange(100):
+        move = 1
         game_obs.initiate_game()
+        # rnd_state = random.choice(list(model.observed_initial_states))
+        # game_obs.state = rnd_state
         while game_obs.game_status == 'in process':
-            new_qval_table = banditAlgorithm.return_decision_reward_tuples(game_obs.state, model)
+            new_qval_table = banditAlgorithm.return_decision_reward_tuples(game_obs.state, model, game_obs.all_possible_decisions)
             best_action, value_estimate = banditAlgorithm.return_decision_with_max_reward(new_qval_table)
             reward = game_obs.play(best_action)
             move += 1

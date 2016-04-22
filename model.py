@@ -79,7 +79,7 @@ class Model(object):
             self.cache_path = self.base_folder_name + "/temp.cache"
             #self.f1 = open(self.base_folder_name + "/train.vw", 'a')
             self.model = pyvw.vw(quiet=True, l2=0.000000001, loss_function='squared', passes=1, holdout_off=True, cache=self.cache_path,
-                                 f=self.model_path,  b=20, lrq='sdsd24') #q='::') #
+                                 f=self.model_path,  b=20, lrq='sdsd200') #q='::') #
 
     def remove_vw_files(self):
         if os.path.isfile(self.cache_path): os.remove(self.cache_path)
@@ -205,7 +205,7 @@ class Model(object):
             # TODO Or just use Scott's awesome scikit learn interface
             # vw = pyvw.vw(quiet=True, lrq='aa7', lrqdropout=True, l2=0.01)
             # Let's use vw as good'old sgd solver
-            for _ in xrange(10):
+            for _ in xrange(20):
                 # May be shuffling not necessary here
                 random.shuffle(X)
                 res = [fv.learn() for fv in X]

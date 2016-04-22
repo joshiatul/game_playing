@@ -38,7 +38,24 @@ class GridWorld(game.AbstractGame):
                 self.all_used_coordinates['y'].add(ya)
                 return xa, ya
 
-    def initiate_game(self, full_rnd=False):
+    def evaluate_and_modify_possible_actions(self):
+        """
+        Based on current state evaluate what actions are possible
+        for a player
+        """
+        x, y = self.state[0]
+        remove_action = ''
+        if y == 0: remove_action = 'left'
+        elif y == 3: remove_action = 'right'
+
+        if x == 0: remove_action = 'up'
+        elif x == 3: remove_action = 'down'
+
+        if 'not' in self.all_possible_decisions:
+            self.all_possible_decisions.remove(remove_action)
+
+
+    def initiate_game(self, full_rnd=True):
         """
         What exactly we know about the game beforehand?
          - all possible actions we can take
@@ -47,6 +64,8 @@ class GridWorld(game.AbstractGame):
          - so our design matrix should only be set of pixels (or image representation) AND decision taken
          - all we know is : there are 4 things on the screen.. lets use sparse representation
         """
+        # Initialize with all possible actions
+        self.all_possible_decisions = ['up', 'down', 'left', 'right']
         if full_rnd:
             random_coors = [self.coordinates(i,j) for i,j in zip(random.sample(xrange(0,4), 4), [random.randint(0,3) for _ in xrange(0, 4)])]
             self.player_info, self.wall_info, self.pit_info, self.win_info = random_coors
@@ -71,6 +90,8 @@ class GridWorld(game.AbstractGame):
         game_state = (self.player_info, self.wall_info, self.pit_info, self.win_info)
         self.state = game_state
         self.game_status = 'in process'
+        # Certain actions are not possible if the player is sitting on the edge
+        self.evaluate_and_modify_possible_actions()
 
     def display_grid(self):
         grid = np.zeros((4,4), dtype='<U2')
@@ -113,8 +134,8 @@ class GridWorld(game.AbstractGame):
 
         # Reset state
         game_state = (self.player_info, self.wall_info, self.pit_info, self.win_info)
-        #info = flatten_list_of_lists(game_state)
-        #self.state = self.state_info(*info)
+        # Certain actions are not possible if the player is sitting on the edge
+        self.evaluate_and_modify_possible_actions()
         self.state = game_state
 
         # Get and return reward
@@ -128,11 +149,9 @@ class GridWorld(game.AbstractGame):
         elif self.player_info == self.win_info:
             self.game_status = 'player wins'
             return 10
-        elif self.player_info == self.player_old_state:
-            return -5
         else:
             # Return distance from win (player looks at screen so i think this is fare)
-            #return -(math.sqrt((self.player_info.x - self.win_info.x)**2 + (self.player_info.y - self.win_info.y)**2))
+            # return -(math.sqrt((self.player_info.x - self.win_info.x)**2 + (self.player_info.y - self.win_info.y)**2))
             return -1
 
 

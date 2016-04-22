@@ -58,21 +58,11 @@ def test_training_TD_for_gridworld(model_class, epochs, train=True):
     # Record % of wins
 
 
-# Test TD-lambda for gridworld
-# TODO For some reason eligibility traces doesn't work as expected
-def test_training_TD_lambda_for_gridworld(model_class, epochs, train=True):
-    gridworld = GridWorld()
-    if train:
-        policy, model = rl.train_reinforcement_strategy_temporal_difference_eligibility_trace(epochs=epochs, game_obs=gridworld, model_class=model_class)
-    rl.test_policy_with_random_play(gridworld)
-
-
-
 if __name__ == "__main__":
     #policy, model = test_training_monte_carlo_for_blackjack(model_class='lookup_table', epochs=5000)
     #policy, model = test_training_monte_carlo_for_blackjack(model_class='vw_python', epochs=5000)
     #policy, model = test_training_TD_for_blackjack(model_class='vw_python', epochs=5000)
-    random_stat, model_stat = test_training_TD_for_gridworld(model_class='vw_python', epochs=20000, train=True)
+    random_stat, model_stat = test_training_TD_for_gridworld(model_class='vw_python', epochs=20000, train=False)
     print random_stat
     print model_stat
     #test_training_TD_lambda_for_gridworld(model_class='vw_python', epochs=1000, train=False)

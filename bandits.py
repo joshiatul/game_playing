@@ -18,9 +18,9 @@ class BanditAlgorithm(object):
         self.decisions = None
 
     # TODO This may belong outside bandit
-    def return_decision_reward_tuples(self, state, model):
+    def return_decision_reward_tuples(self, state, model, all_possible_decisions):
         q_value_table = []
-        for decision in model.all_possible_decisions:
+        for decision in all_possible_decisions:
             if model.exists:
                 decision_state = (state, decision)
                 feature_vector, y = model.return_design_matrix(decision_state)
@@ -35,33 +35,33 @@ class BanditAlgorithm(object):
         return q_value_table[0]
 
 
-    def return_action_based_on_greedy_policy(self, state, model):
+    def return_action_based_on_greedy_policy(self, state, model, all_possible_decisions):
 
         if model.exists:
             result=()
-            q_value_table = self.return_decision_reward_tuples(state, model)
+            q_value_table = self.return_decision_reward_tuples(state, model, all_possible_decisions)
             # Store policy learned so far
             if q_value_table:
                 result = self.return_decision_with_max_reward(q_value_table)
         else:
-            result = (random.choice(model.all_possible_decisions), 0)
+            result = (random.choice(all_possible_decisions), 0)
 
         return result
 
-    def select_decision_given_state(self, state, model=None, algorithm='random'):
+    def select_decision_given_state(self, state, all_possible_decisions, model=None, algorithm='random'):
 
         if algorithm == 'epsilon-greedy':
             if random.random() > self.params:
 
-                result = self.return_action_based_on_greedy_policy(state, model)
+                result = self.return_action_based_on_greedy_policy(state, model, all_possible_decisions)
                 if result:
                     best_known_decision, max_reward = result
                     self.policy[state] = [state[0], state[1], best_known_decision, max_reward]
 
                 else:
-                    best_known_decision, max_reward = (random.choice(model.all_possible_decisions), 0)
+                    best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
 
             else:
-                best_known_decision, max_reward = (random.choice(model.all_possible_decisions), 0)
+                best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
 
             return best_known_decision, max_reward
