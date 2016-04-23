@@ -16,6 +16,7 @@ class GridWorld(game.AbstractGame):
     def __init__(self):
         self.base_folder_name = os.path.dirname(os.path.realpath(__file__))
         self.all_possible_decisions = ['up', 'down', 'left', 'right']
+        self.all_decisions = ['up', 'down', 'left', 'right']
 
         game_objects = ['player', 'wall', 'pit', 'win']
         game_state_tuples = [[obs + '_x', obs + '_y'] for obs in game_objects]
@@ -42,17 +43,21 @@ class GridWorld(game.AbstractGame):
         """
         Based on current state evaluate what actions are possible
         for a player
+        All walls block player movement
+        This needs to be evaluated after every play
         """
-        x, y = self.state[0]
-        remove_action = ''
-        if y == 0: remove_action = 'left'
-        elif y == 3: remove_action = 'right'
+        remove_actions = set()
+        pl_x, pl_y = self.state[0]
+        wall_x, wall_y = self.state[1]
 
-        if x == 0: remove_action = 'up'
-        elif x == 3: remove_action = 'down'
+        # If player is near wall (grid boundary or wall object) action is blocked
+        if pl_y == 0 or pl_y-1 == wall_y: remove_actions.add('left')
+        elif pl_y == 3 or pl_y+1 == wall_y: remove_actions.add('right')
 
-        if 'not' in self.all_possible_decisions:
-            self.all_possible_decisions.remove(remove_action)
+        if pl_x == 0 or pl_x-1 == wall_x: remove_actions.add('up')
+        elif pl_x == 3 or pl_x+1 == wall_x: remove_actions.add('down')
+
+        self.all_possible_decisions = [i for i in self.all_decisions if i not in remove_actions]
 
 
     def initiate_game(self, full_rnd=True):
@@ -64,8 +69,7 @@ class GridWorld(game.AbstractGame):
          - so our design matrix should only be set of pixels (or image representation) AND decision taken
          - all we know is : there are 4 things on the screen.. lets use sparse representation
         """
-        # Initialize with all possible actions
-        self.all_possible_decisions = ['up', 'down', 'left', 'right']
+
         if full_rnd:
             random_coors = [self.coordinates(i,j) for i,j in zip(random.sample(xrange(0,4), 4), [random.randint(0,3) for _ in xrange(0, 4)])]
             self.player_info, self.wall_info, self.pit_info, self.win_info = random_coors
@@ -151,7 +155,7 @@ class GridWorld(game.AbstractGame):
             return 10
         else:
             # Return distance from win (player looks at screen so i think this is fare)
-            # return -(math.sqrt((self.player_info.x - self.win_info.x)**2 + (self.player_info.y - self.win_info.y)**2))
+            #return -(math.sqrt((self.player_info.x - self.win_info.x)**2 + (self.player_info.y - self.win_info.y)**2))
             return -1
 
 

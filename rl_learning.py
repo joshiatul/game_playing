@@ -65,20 +65,18 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
 
     model = Model({'class': model_class, 'base_folder_name': game_obs.base_folder_name})
     model.initialize()
-    epsilon = 0.25
+    epsilon = 0.99
     banditAlgorithm = BanditAlgorithm(params=epsilon)
-    memory_storage_limit = 20
+    memory_storage_limit = 500
     memory_storage = deque(maxlen=memory_storage_limit)
-    batchsize = 10
-    gamma = 0.5 #### Seems very critical to tune this .. lower the better (0.1 works best for continuous reward)
+    batchsize = 100
+    gamma = 0.1 #### Seems very critical to tune this .. lower the better (0.1 works best for continuous reward)
     steps = 1 # More than 1 steps doesn't work well.. why??
     max_steps = 50
     seen_initial_states = []
     wins = 0
     loss = 0
     new_games = 0
-
-    # model.all_possible_decisions = game_obs.all_possible_decisions
 
     for _ in xrange(epochs):
 
@@ -140,13 +138,11 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
                         # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
                         if game_obs.game_status == 'in process' and model.exists:  # non-terminal state
                             # Get value estimate for that best action and update EXISTING reward
-                            # TODO: Bug here? I think the returned action needs to be played to observe the reward
-                            #TODO Instead i am getting the reward "estimate" based on the model
+
                             if algo == 'q_learning':
                                 result = banditAlgorithm.return_action_based_on_greedy_policy(new_state_er, model, game_obs.all_possible_decisions)
                                 max_reward = result[1]
-                                #TODO BAAM i think this is the correct WAY!!!!!
-                                #max_reward = game_obs.play(result[0])
+
                             elif algo == 'sarsa':
                                 result = banditAlgorithm.select_decision_given_state(new_state_er, game_obs.all_possible_decisions, model, algorithm='epsilon-greedy')
                                 max_reward = game_obs.play(result[0])
@@ -198,8 +194,8 @@ def test_policy_with_random_play(game_obs, model=None):
     for _ in xrange(100):
         game_obs.initiate_game()
         while game_obs.game_status == 'in process':
-            random_action = random.choice(game_obs.all_possible_decisions)
-            random_reward = game_obs.play(random_action)
+            # random_action = random.choice(game_obs.all_possible_decisions)
+            # random_reward = game_obs.play(random_action)
             mv += 1
             if mv >= 50 and game_obs.game_status == 'in process':
                 random_stat['in process'] += 1
