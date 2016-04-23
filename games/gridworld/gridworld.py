@@ -47,15 +47,15 @@ class GridWorld(game.AbstractGame):
         This needs to be evaluated after every play
         """
         remove_actions = set()
-        pl_x, pl_y = self.state[0]
-        wall_x, wall_y = self.state[1]
-
-        # If player is near wall (grid boundary or wall object) action is blocked
-        if pl_y == 0 or pl_y-1 == wall_y: remove_actions.add('left')
-        elif pl_y == 3 or pl_y+1 == wall_y: remove_actions.add('right')
-
-        if pl_x == 0 or pl_x-1 == wall_x: remove_actions.add('up')
-        elif pl_x == 3 or pl_x+1 == wall_x: remove_actions.add('down')
+        # pl_x, pl_y = self.state[0]
+        # wall_x, wall_y = self.state[1]
+        #
+        # # If player is near wall (grid boundary or wall object) action is blocked
+        # if pl_y == 0 or pl_y-1 == wall_y: remove_actions.add('left')
+        # elif pl_y == 3 or pl_y+1 == wall_y: remove_actions.add('right')
+        #
+        # if pl_x == 0 or pl_x-1 == wall_x: remove_actions.add('up')
+        # elif pl_x == 3 or pl_x+1 == wall_x: remove_actions.add('down')
 
         self.all_possible_decisions = [i for i in self.all_decisions if i not in remove_actions]
 
@@ -149,14 +149,16 @@ class GridWorld(game.AbstractGame):
     def get_reward(self):
         if self.player_info == self.pit_info:
             self.game_status = 'player loses'
-            return -10
+            return -20
         elif self.player_info == self.win_info:
             self.game_status = 'player wins'
-            return 10
+            return 20
+        elif self.player_info == self.player_old_state:
+            return -10
         else:
             # Return distance from win (player looks at screen so i think this is fare)
-            #return -(math.sqrt((self.player_info.x - self.win_info.x)**2 + (self.player_info.y - self.win_info.y)**2))
-            return -1
+            return -(math.sqrt((self.player_info.x - self.win_info.x)**2 + (self.player_info.y - self.win_info.y)**2))
+            #return -1
 
 
 if __name__ == "__main__":

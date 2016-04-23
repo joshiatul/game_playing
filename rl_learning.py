@@ -67,9 +67,9 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
     model.initialize()
     epsilon = 0.99
     banditAlgorithm = BanditAlgorithm(params=epsilon)
-    memory_storage_limit = 500
+    memory_storage_limit = 20
     memory_storage = deque(maxlen=memory_storage_limit)
-    batchsize = 100
+    batchsize = 10
     gamma = 0.1 #### Seems very critical to tune this .. lower the better (0.1 works best for continuous reward)
     steps = 1 # More than 1 steps doesn't work well.. why??
     max_steps = 50
@@ -190,14 +190,14 @@ def test_policy_with_random_play(game_obs, model=None):
     print game_obs.state
 
     random_stat = Counter()
-    mv = 1
     for _ in xrange(100):
+        mv = 1
         game_obs.initiate_game()
         while game_obs.game_status == 'in process':
-            # random_action = random.choice(game_obs.all_possible_decisions)
-            # random_reward = game_obs.play(random_action)
+            random_action = random.choice(game_obs.all_possible_decisions)
+            random_reward = game_obs.play(random_action)
             mv += 1
-            if mv >= 50 and game_obs.game_status == 'in process':
+            if mv >= 10 and game_obs.game_status == 'in process':
                 random_stat['in process'] += 1
                 break
         if game_obs.game_status == 'player wins':
@@ -223,7 +223,7 @@ def test_policy_with_random_play(game_obs, model=None):
             best_action, value_estimate = banditAlgorithm.return_decision_with_max_reward(new_qval_table)
             reward = game_obs.play(best_action)
             move += 1
-            if move >= 50 and game_obs.game_status == 'in process':
+            if move >= 10 and game_obs.game_status == 'in process':
                 model_stat['in process'] += 1
                 break
 
