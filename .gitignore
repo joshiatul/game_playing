@@ -64,8 +64,8 @@ target/
 # Created by .ignore support plugin (hsz.mobi)
 
 # Ignore vw files
-#*.vw
-#*.pkl
+*.vw
+*.pkl
 *.cache
 *.writing
 .idea/
