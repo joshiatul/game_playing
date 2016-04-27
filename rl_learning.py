@@ -77,10 +77,13 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
     wins = 0
     loss = 0
     new_games = 0
+    lamb = 0.1 # For td lambda methods
 
-    for _ in xrange(epochs):
+    for episode in xrange(epochs):
 
         # Initialize game and parameters for this epoch
+        # Store rewards for all steps in an episode
+        episodic_memory=[]
         game_obs.initiate_game()
         #TODO check what testing is doing
         if game_obs.state not in set(seen_initial_states):
@@ -92,7 +95,7 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
 
         banditAlgorithm.params = epsilon
         move = 0
-        print 'Game #: {0}'.format(_)
+        print 'Game #: {0}'.format(episode)
         print a
 
         # Start playing the game
@@ -111,11 +114,16 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
             best_known_decision, known_reward = banditAlgorithm.select_decision_given_state(game_obs.state, game_obs.all_possible_decisions, model, algorithm='epsilon-greedy')
             # Make move to get to a new state and observe reward (Remember this could be a terminal state)
             reward = game_obs.play(best_known_decision)
+            episodic_memory.append(reward)
             new_state = game_obs.state
 
             # Experience replay storage (deque object maintains a queue, so no extra processing needed)
             # If buffer is full, it gets overwritten due to deque magic
-            memory_storage.appendleft((old_state, best_known_decision, reward, new_state))
+            queue_key = (episode, move)
+            episodic_memory.append(reward)
+            memory_storage.appendleft({queue_key: (old_state, best_known_decision, reward, new_state)})
+
+            # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
 
             # If buffer not filled, continue and collect sample to train
             if (len(memory_storage) < memory_storage_limit):
@@ -128,28 +136,25 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
                 minibatch = random.sample(memory_storage, batchsize)
 
                 # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
-                for memory in minibatch:
+                for memory_dict in minibatch:
 
-                    old_state_er, action_er, reward_er, new_state_er = memory
+                    memory_lst = memory_dict.values()[0]
+                    old_state_er, action_er, reward_er, new_state_er = memory_lst
 
-                    # How far in the future you want to go?
-                    for step in xrange(1, steps + 1):
+                    # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
+                    if game_obs.game_status == 'in process' and model.exists:  # non-terminal state
+                        # Get value estimate for that best action and update EXISTING reward
 
-                        # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
-                        if game_obs.game_status == 'in process' and model.exists:  # non-terminal state
-                            # Get value estimate for that best action and update EXISTING reward
+                        if algo == 'q_learning':
+                            result = banditAlgorithm.return_action_based_on_greedy_policy(new_state_er, model, game_obs.all_possible_decisions)
+                            max_reward = result[1]
 
-                            if algo == 'q_learning':
-                                result = banditAlgorithm.return_action_based_on_greedy_policy(new_state_er, model, game_obs.all_possible_decisions)
-                                max_reward = result[1]
+                        # Update reward for the current step AND for last n stapes (if n is large, we deploy TD-lambda)
+                        # TODO TD-lambda
+                        if result:
+                            reward_er += gamma * max_reward
 
-                            elif algo == 'sarsa':
-                                result = banditAlgorithm.select_decision_given_state(new_state_er, game_obs.all_possible_decisions, model, algorithm='epsilon-greedy')
-                                max_reward = game_obs.play(result[0])
-
-                            if result:
-                                reward_er += (gamma ** step) * max_reward
-
+                    # Design matrix is based on estimate of reward at state,action step t+1
                     X_new, y_new = model.return_design_matrix((old_state_er, action_er), reward_er)
 
                     if model.model_class != 'lookup_table':

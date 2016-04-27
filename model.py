@@ -181,6 +181,8 @@ class Model(object):
                         self.model[(decision_state[0], d)] = bandit.DecisionState()
 
                 self.model[decision_state].count += 1
+                # new pred = old pred + (1/count)*(truth - old pred)
+                # Incremental or running average
                 updated_value = self.model[decision_state].value_estimate + (1.0 / self.model[decision_state].count) * (
                     y - self.model[decision_state].value_estimate)
                 self.model[decision_state].value_estimate = updated_value
