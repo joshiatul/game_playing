@@ -73,11 +73,8 @@ class Model(object):
             # self.remove_vw_files()
 
         elif self.model_class == 'vw_python':
-            # TODO interactions, lrq, dropout etc commands go here
-            # TODO Need to pass model path and throw finish somewhere to store the final model
             self.model_path = self.base_folder_name + "/model.vw"
             self.cache_path = self.base_folder_name + "/temp.cache"
-            #self.f1 = open(self.base_folder_name + "/train.vw", 'a')
             self.model = pyvw.vw(quiet=True, l2=0.000000001, loss_function='squared', passes=1, holdout_off=True, cache=self.cache_path,
                                  f=self.model_path,  b=20, lrq='sdsd200') #q='::') #
 
@@ -86,37 +83,16 @@ class Model(object):
         if os.path.isfile(self.f1): os.remove(self.f1)
         if os.path.isfile(self.model_path): os.remove(self.model_path)
 
-    # def if_model_exists(self):
-    #     exists = False
-    #     if self.model_class == 'lookup_table':
-    #         if self.model:
-    #             self.exists = True
-    #
-    #     elif self.model_class == 'scikit':
-    #         if hasattr(self.model, 'intercept_'):
-    #             self.exists = True
-    #
-    #     elif self.model_class == 'vw':
-    #         if os.path.isfile(self.model_path):
-    #             self.exists = True
-    #
-    #     elif self.model_class == 'vw_python':
-    #         return self.exists
-    #
-    #     return exists
-
     def clean_buffer(self):
         self.X = []
         self.y = []
         self.buffer = 0
 
-    # TODO Store design matrix in cache so we don't have to compute it all the time
     def return_design_matrix(self, decision_state, reward=None):
         """
         Design matrix can simply return catesian product of state and decision
         For now all categorical features
         """
-        # TODO Kill game specific features
         if self.model_class == 'lookup_table':
             return decision_state, reward
 
@@ -152,7 +128,6 @@ class Model(object):
                     if reward:
                         output = str(reward) #+ " " + tag
                         fv = output + " |sd " + input + '\n'
-                        #self.f1.write(fv)
                     else:
                         fv = " |sd " + input + '\n'
 
@@ -202,17 +177,12 @@ class Model(object):
             self.exists = True
 
         elif self.model_class == 'vw_python':
-            # TODO create example and fit
-            # TODO Remember X is list of examples (not a single example) SO How to go about that?
-            # TODO Or just use Scott's awesome scikit learn interface
-            # vw = pyvw.vw(quiet=True, lrq='aa7', lrqdropout=True, l2=0.01)
             # Let's use vw as good'old sgd solver
             for _ in xrange(20):
                 # May be shuffling not necessary here
                 random.shuffle(X)
                 res = [fv.learn() for fv in X]
             self.exists = True
-            #print 'done'
 
     def predict(self, test):
         if self.model_class == 'scikit':
@@ -235,7 +205,6 @@ class Model(object):
                 return float(res)
 
         elif self.model_class == 'vw_python':
-            # TODO Create example and fit
             test.learn()  # Little wierd that we have to call learn at all for a prediction
             res = test.get_simplelabel_prediction()
             return res
