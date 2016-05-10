@@ -9,10 +9,10 @@ class AbstractGame(object):
         self.game_status = None
         self.state = None
         self.base_folder_name = None
-        self.all_possible_decisions = None
+        self.action_space = None
 
     @abstractmethod
-    def initiate_game(self):
+    def reset(self):
         """
         This should set the initial state
         """
@@ -26,7 +26,7 @@ class AbstractGame(object):
         pass
 
     @abstractmethod
-    def play(self):
+    def step(self):
         """
         This should update state after interacting with the
         environment. Mostly used for temporal difference learning

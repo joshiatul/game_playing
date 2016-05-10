@@ -9,7 +9,7 @@ class BlackJack(game.AbstractGame):
 
     def __init__(self):
         self.base_folder_name = os.path.dirname(os.path.realpath(__file__))
-        self.all_possible_decisions = ['hit', 'stay']
+        self.action_space = ['hit', 'stay']
 
     def print_game_status(self):
         if self.decision:
@@ -100,7 +100,7 @@ class BlackJack(game.AbstractGame):
 
         return status, reward
 
-    def initiate_game(self):
+    def reset(self):
 
         self.player_hand = []
         self.dealer_hand = []
@@ -141,7 +141,7 @@ class BlackJack(game.AbstractGame):
         while self.dealer_value < 17:
             self.add_card_to_dealer(self.random_card())
 
-    def play(self, decision):
+    def step(self, decision):
         self.decision = decision
         if decision == 'stay':
             # Evaluate game, dealer plays
@@ -164,10 +164,10 @@ class BlackJack(game.AbstractGame):
         while self.game_status == 'in process':
             # self.print_game_status()
             state = self.state_info(self.player_value, self.dealer_value)
-            decision, prob = banditAlgorithm.select_decision_given_state(state, self.all_possible_decisions, model=model, algorithm='epsilon-greedy')
+            decision, prob = banditAlgorithm.select_decision_given_state(state, self.action_space, model=model, algorithm='epsilon-greedy')
 
             # Only terminal state returns a valid reward
-            reward = self.play(decision)
+            reward = self.step(decision)
 
             all_decision_states.append((state, decision))
 

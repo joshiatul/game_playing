@@ -62,7 +62,7 @@ if __name__ == "__main__":
     #policy, model = test_training_monte_carlo_for_blackjack(model_class='lookup_table', epochs=5000)
     #policy, model = test_training_monte_carlo_for_blackjack(model_class='vw_python', epochs=5000)
     #policy, model = test_training_TD_for_blackjack(model_class='vw_python', epochs=5000)
-    random_stat, model_stat = test_training_TD_for_gridworld(model_class='vw_python', epochs=50000, train=False)
+    random_stat, model_stat = test_training_TD_for_gridworld(model_class='vw_python', epochs=5000, train=True)
     print random_stat
     print model_stat
     #test_training_TD_lambda_for_gridworld(model_class='vw_python', epochs=1000, train=False)

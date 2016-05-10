@@ -38,13 +38,13 @@ def train_reinforcement_learning_strategy(num_sims=1, game_obs='blackjack', mode
     banditAlgorithm = BanditAlgorithm(params=0.1)
     model.initialize()
 
-    model.all_possible_decisions = game_obs.all_possible_decisions
+    model.all_possible_decisions = game_obs.action_space
 
     for _ in xrange(num_sims):
         model.buffer += 1
 
         # Initialize game
-        game_obs.initiate_game()
+        game_obs.reset()
         if game_obs.game_status != 'in process':
             continue
 
@@ -84,7 +84,7 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
         # Initialize game and parameters for this epoch
         # Store rewards for all steps in an episode
         episodic_memory=[]
-        game_obs.initiate_game()
+        game_obs.reset()
         #TODO check what testing is doing
         if game_obs.state not in set(seen_initial_states):
             print "--------------------------------- new initial game"
@@ -111,9 +111,9 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
             old_state = game_obs.state
 
             # Figure out best action based on policy
-            best_known_decision, known_reward = banditAlgorithm.select_decision_given_state(game_obs.state, game_obs.all_possible_decisions, model, algorithm='epsilon-greedy')
+            best_known_decision, known_reward = banditAlgorithm.select_decision_given_state(game_obs.state, game_obs.action_space, model, algorithm='epsilon-greedy')
             # Make move to get to a new state and observe reward (Remember this could be a terminal state)
-            reward = game_obs.play(best_known_decision)
+            reward = game_obs.step(best_known_decision)
             episodic_memory.append(reward)
             new_state = game_obs.state
 
@@ -146,7 +146,7 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
                         # Get value estimate for that best action and update EXISTING reward
 
                         if algo == 'q_learning':
-                            result = banditAlgorithm.return_action_based_on_greedy_policy(new_state_er, model, game_obs.all_possible_decisions)
+                            result = banditAlgorithm.return_action_based_on_greedy_policy(new_state_er, model, game_obs.action_space)
                             max_reward = result[1]
 
                         # Update reward for the current step AND for last n stapes (if n is large, we deploy TD-lambda)
@@ -190,17 +190,17 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
 def test_policy_with_random_play(game_obs, model=None):
     print "---------- Testing policy:-----------"
     banditAlgorithm = BanditAlgorithm(params=0.1)
-    game_obs.initiate_game()
+    game_obs.reset()
     print "Initial state:"
     print game_obs.state
 
     random_stat = Counter()
     for _ in xrange(100):
         mv = 1
-        game_obs.initiate_game()
+        game_obs.reset()
         while game_obs.game_status == 'in process':
-            random_action = random.choice(game_obs.all_possible_decisions)
-            random_reward = game_obs.play(random_action)
+            random_action = random.choice(game_obs.action_space)
+            random_reward = game_obs.step(random_action)
             mv += 1
             if mv >= 10 and game_obs.game_status == 'in process':
                 random_stat['in process'] += 1
@@ -220,13 +220,13 @@ def test_policy_with_random_play(game_obs, model=None):
     model_stat = Counter()
     for _ in xrange(100):
         move = 1
-        game_obs.initiate_game()
+        game_obs.reset()
         # rnd_state = random.choice(list(model.observed_initial_states))
         # game_obs.state = rnd_state
         while game_obs.game_status == 'in process':
-            new_qval_table = banditAlgorithm.return_decision_reward_tuples(game_obs.state, model, game_obs.all_possible_decisions)
+            new_qval_table = banditAlgorithm.return_decision_reward_tuples(game_obs.state, model, game_obs.action_space)
             best_action, value_estimate = banditAlgorithm.return_decision_with_max_reward(new_qval_table)
-            reward = game_obs.play(best_action)
+            reward = game_obs.step(best_action)
             move += 1
             if move >= 10 and game_obs.game_status == 'in process':
                 model_stat['in process'] += 1

@@ -15,7 +15,7 @@ class GridWorld(game.AbstractGame):
 
     def __init__(self):
         self.base_folder_name = os.path.dirname(os.path.realpath(__file__))
-        self.all_possible_decisions = ['up', 'down', 'left', 'right']
+        self.action_space = ['up', 'down', 'left', 'right']
         self.all_decisions = ['up', 'down', 'left', 'right']
 
         game_objects = ['player', 'wall', 'pit', 'win']
@@ -44,7 +44,7 @@ class GridWorld(game.AbstractGame):
         Based on current state evaluate what actions are possible
         for a player
         All walls block player movement
-        This needs to be evaluated after every play
+        This needs to be evaluated after every step
         """
         remove_actions = set()
         # pl_x, pl_y = self.state[0]
@@ -57,10 +57,10 @@ class GridWorld(game.AbstractGame):
         # if pl_x == 0 or pl_x-1 == wall_x: remove_actions.add('up')
         # elif pl_x == 3 or pl_x+1 == wall_x: remove_actions.add('down')
 
-        self.all_possible_decisions = [i for i in self.all_decisions if i not in remove_actions]
+        self.action_space = [i for i in self.all_decisions if i not in remove_actions]
 
 
-    def initiate_game(self, full_rnd=True):
+    def reset(self, full_rnd=True):
         """
         What exactly we know about the game beforehand?
          - all possible actions we can take
@@ -114,7 +114,7 @@ class GridWorld(game.AbstractGame):
     def complete_one_episode(self):
         pass
 
-    def play(self, action):
+    def step(self, action):
         self.player_old_state = self.player_info
         if action == 'left':
             new_loc = self.coordinates(self.player_info.x, self.player_info.y-1)
@@ -163,19 +163,19 @@ class GridWorld(game.AbstractGame):
 
 if __name__ == "__main__":
     gridworld = GridWorld()
-    gridworld.initiate_game()
+    gridworld.reset()
     print gridworld.player_info
     gridworld.display_grid()
-    reward = gridworld.play('down')
+    reward = gridworld.step('down')
     print gridworld.player_info
     gridworld.display_grid()
-    reward = gridworld.play('down')
+    reward = gridworld.step('down')
     print gridworld.player_info
     print gridworld.display_grid()
-    reward = gridworld.play('down')
+    reward = gridworld.step('down')
     print gridworld.player_info
     print gridworld.display_grid()
-    reward = gridworld.play('right')
+    reward = gridworld.step('right')
     print gridworld.player_info
     print gridworld.display_grid()
 
