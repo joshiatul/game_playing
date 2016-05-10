@@ -1,11 +1,5 @@
-from model import Model
-from bandits import BanditAlgorithm
-from games.blackjack.blackjack import BlackJack
-from games.gridworld.gridworld import GridWorld
+from environments.blackjack.blackjack import BlackJack
 import pandas as pd
-import random
-import time
-import cPickle as pickle
 import rl_learning as rl
 
 # Test simple monte-carlo learning for blackjack
@@ -46,23 +40,7 @@ def test_training_TD_for_blackjack(model_class, epochs=5000):
 
     return policy, model
 
-# Test TD for gridworld
-def test_training_TD_for_gridworld(model_class, epochs, train=True):
-    gridworld = GridWorld()
-    if train:
-        policy, model = rl.train_reinforcement_strategy_temporal_difference(epochs=epochs, game_obs=gridworld, model_class=model_class)
-    random_stat, model_stat = rl.test_policy_with_random_play(gridworld)
-    return random_stat, model_stat
 
-    # Record MSE for each epoch may be?
-    # Record % of wins
-
-
-if __name__ == "__main__":
-    #policy, model = test_training_monte_carlo_for_blackjack(model_class='lookup_table', epochs=5000)
-    #policy, model = test_training_monte_carlo_for_blackjack(model_class='vw_python', epochs=5000)
-    #policy, model = test_training_TD_for_blackjack(model_class='vw_python', epochs=5000)
-    random_stat, model_stat = test_training_TD_for_gridworld(model_class='vw_python', epochs=5000, train=True)
-    print random_stat
-    print model_stat
-    #test_training_TD_lambda_for_gridworld(model_class='vw_python', epochs=1000, train=False)
+#policy, model = test_training_monte_carlo_for_blackjack(model_class='lookup_table', epochs=5000)
+#policy, model = test_training_monte_carlo_for_blackjack(model_class='vw_python', epochs=5000)
+policy, model = test_training_TD_for_blackjack(model_class='vw_python', epochs=5000)
