@@ -1,4 +1,4 @@
-from environments.blackjack.blackjack import BlackJack
+from environments.blackjack import BlackJack
 import pandas as pd
 import rl_learning as rl
 

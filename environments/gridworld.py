@@ -1,8 +1,6 @@
 import random
-from abc import ABCMeta, abstractmethod
 from collections import namedtuple
-from .. import game
-import os
+from . import game
 import numpy as np
 import pandas as pd
 import math
@@ -14,7 +12,6 @@ def flatten_list_of_lists(list_of_lists):
 class GridWorld(game.AbstractGame):
 
     def __init__(self):
-        self.base_folder_name = os.path.dirname(os.path.realpath(__file__))
         self.action_space = ['up', 'down', 'left', 'right']
         self.all_decisions = ['up', 'down', 'left', 'right']
 
@@ -26,8 +23,7 @@ class GridWorld(game.AbstractGame):
         self.coordinates = namedtuple('coordinates', ['x', 'y'])
         self.all_used_coordinates = {'x': set(), 'y': set()}
 
-        self.game_status = None
-        self.state = None
+        super(GridWorld, self).__init__('gridworld')
 
     def random_unsed_coordinates(self, a, b):
         # TODO Fix this
@@ -144,6 +140,7 @@ class GridWorld(game.AbstractGame):
 
         # Get and return reward
         reward = self.get_reward()
+        # Needs to return <observation, reward, done, info>
         return reward
 
     def get_reward(self):

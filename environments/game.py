@@ -5,11 +5,11 @@ class AbstractGame(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self):
+    def __init__(self, name):
         self.game_status = None
         self.state = None
-        self.base_folder_name = None
         self.action_space = None
+        self.base_folder_name = os.path.dirname(os.path.realpath(__file__)).replace('environments', 'solved_environments') + '/' + name
 
     @abstractmethod
     def reset(self):
@@ -30,6 +30,6 @@ class AbstractGame(object):
         """
         This should update state after interacting with the
         environment. Mostly used for temporal difference learning
-        :return: reward
+        :return: <observation, reward, done, info>
         """
         pass

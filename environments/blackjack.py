@@ -8,8 +8,8 @@ import os
 class BlackJack(game.AbstractGame):
 
     def __init__(self):
-        self.base_folder_name = os.path.dirname(os.path.realpath(__file__))
         self.action_space = ['hit', 'stay']
+        super(BlackJack, self).__init__('blackjack')
 
     def print_game_status(self):
         if self.decision:
@@ -156,6 +156,8 @@ class BlackJack(game.AbstractGame):
         self.game_status = status
         self.state = self.state_info(self.player_value, self.dealer_value)
         #self.information = self.state_info(self.player_value, self.dealer_value)
+
+        # Needs to return <observation, reward, done, info>
 
         return reward
 
