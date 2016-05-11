@@ -112,9 +112,9 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
             # Figure out best action based on policy
             best_known_decision, known_reward = banditAlgorithm.select_decision_given_state(game_obs.state, game_obs.action_space, model, algorithm='epsilon-greedy')
             # Make move to get to a new state and observe reward (Remember this could be a terminal state)
-            reward = game_obs.step(best_known_decision)
+            new_state, reward, done, info = game_obs.step(best_known_decision)
             episodic_memory.append(reward)
-            new_state = game_obs.state
+            #new_state = game_obs.state
 
             # Experience replay storage (deque object maintains a queue, so no extra processing needed)
             # If buffer is full, it gets overwritten due to deque magic

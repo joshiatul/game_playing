@@ -158,8 +158,9 @@ class BlackJack(game.AbstractGame):
         #self.information = self.state_info(self.player_value, self.dealer_value)
 
         # Needs to return <observation, reward, done, info>
+        done = True if self.game_status != 'in process' else False
 
-        return reward
+        return self.state, reward, done, []
 
     def complete_one_episode(self, banditAlgorithm, model=None):
         all_decision_states = []
@@ -169,7 +170,8 @@ class BlackJack(game.AbstractGame):
             decision, prob = banditAlgorithm.select_decision_given_state(state, self.action_space, model=model, algorithm='epsilon-greedy')
 
             # Only terminal state returns a valid reward
-            reward = self.step(decision)
+            # Needs to return <observation, reward, done, info> gym compatible
+            observation, reward, done, info = self.step(decision)
 
             all_decision_states.append((state, decision))
 

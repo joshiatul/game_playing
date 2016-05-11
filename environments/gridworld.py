@@ -141,7 +141,8 @@ class GridWorld(game.AbstractGame):
         # Get and return reward
         reward = self.get_reward()
         # Needs to return <observation, reward, done, info>
-        return reward
+        done = True if self.game_status != 'in process' else False
+        return self.state, reward, done, []
 
     def get_reward(self):
         if self.player_info == self.pit_info:
