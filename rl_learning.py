@@ -86,17 +86,16 @@ def train_reinforcement_strategy_temporal_difference(epochs=1, game_obs='blackja
         episodic_memory=[]
         game_obs.reset()
         #TODO check what testing is doing
-        if game_obs.state not in set(seen_initial_states):
-            print "--------------------------------- new initial game"
-            new_games += 1
-        a = tuple([tuple(obs) for obs in game_obs.state])
-        seen_initial_states.append(a)
-        model.observed_initial_states = set(seen_initial_states)
+        # if game_obs.state not in set(seen_initial_states):
+        #     print "--------------------------------- new initial game"
+        #     new_games += 1
+        # a = tuple([tuple(obs) for obs in game_obs.state])
+        # seen_initial_states.append(a)
+        # model.observed_initial_states = set(seen_initial_states)
 
         banditAlgorithm.params = epsilon
         move = 0
         print 'Game #: {0}'.format(episode)
-        print a
 
         # Start playing the game
         for move in xrange(max_steps):

@@ -6,9 +6,6 @@ class AbstractGame(object):
     __metaclass__ = ABCMeta
 
     def __init__(self, name):
-        self.game_status = None
-        self.state = None
-        self.action_space = None
         self.base_folder_name = os.path.dirname(os.path.realpath(__file__)).replace('environments', 'solved_environments') + '/' + name
 
     @abstractmethod

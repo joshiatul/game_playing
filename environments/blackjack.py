@@ -1,6 +1,6 @@
 import random
 from collections import namedtuple
-from .. import game
+from . import game
 import os
 
 # TODO Resolve for information <===> state.. unneccessary confusion
