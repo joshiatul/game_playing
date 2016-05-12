@@ -43,4 +43,4 @@ def test_training_TD_for_blackjack(model_class, epochs=5000):
 
 #policy, model = test_training_monte_carlo_for_blackjack(model_class='lookup_table', epochs=5000)
 #policy, model = test_training_monte_carlo_for_blackjack(model_class='vw_python', epochs=5000)
-policy, model = test_training_TD_for_blackjack(model_class='vw_python', epochs=5000)
+policy, model = test_training_TD_for_blackjack(model_class='vw_python', epochs=10000)

@@ -7,6 +7,7 @@ class AbstractGame(object):
 
     def __init__(self, name):
         self.base_folder_name = os.path.dirname(os.path.realpath(__file__)).replace('environments', 'solved_environments') + '/' + name
+        # state should be a vector (1d array)
 
     @abstractmethod
     def reset(self):
@@ -23,7 +24,7 @@ class AbstractGame(object):
         pass
 
     @abstractmethod
-    def step(self):
+    def step(self, action):
         """
         This should update state after interacting with the
         environment. Mostly used for temporal difference learning

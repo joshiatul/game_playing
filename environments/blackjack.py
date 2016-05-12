@@ -127,7 +127,8 @@ class BlackJack(game.AbstractGame):
 
         status, reward = self.evaluate_game()
         self.game_status = status
-        self.state = self.state_info(self.player_value, self.dealer_value)
+        #self.state = self.state_info(self.player_value, self.dealer_value)
+        self.state = tuple('-'.join([i, str(j)]) for i, j in zip(self.state._fields, self.state))
         #self.information = self.state_info(self.player_value, self.dealer_value)
 
         return
@@ -154,7 +155,8 @@ class BlackJack(game.AbstractGame):
             status, reward = self.evaluate_game(decision)
 
         self.game_status = status
-        self.state = self.state_info(self.player_value, self.dealer_value)
+        #self.state = self.state_info(self.player_value, self.dealer_value)
+        self.state = tuple(('-'.join([i, str(j)]) for i, j in zip(self.state._fields, self.state)))
         #self.information = self.state_info(self.player_value, self.dealer_value)
 
         # Needs to return <observation, reward, done, info>

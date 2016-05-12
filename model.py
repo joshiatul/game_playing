@@ -109,10 +109,13 @@ class Model(object):
                 # Right now features are simply state X decision interaction + single interaction feature representing state
                 try:
                     _ = len(state[0])
-                    all_features = ['feature' + str(idx) + '-' + '-'.join(str(x) for x in obs) + '-' + decision_taken for idx, obs in enumerate(state)]
+                    # all_features = ['feature' + str(idx) + '-' + '-'.join(str(x) for x in obs) + '-' + decision_taken for idx, obs in enumerate(state)]
+                    # Features are simply pixel-action interactions
+                    all_features = [obs + '-' + decision_taken for obs in state]
 
                 # Hmm design matrix for blackjack is different
                 except TypeError:
+                    # Not needed anymore
                     all_features = ['-'.join([i, str(j), decision_taken]) for i, j in zip(state._fields, state)]
 
                 tag = '_'.join(all_features)

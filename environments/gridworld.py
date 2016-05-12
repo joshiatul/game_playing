@@ -88,6 +88,7 @@ class GridWorld(game.AbstractGame):
             self.win_info = self.coordinates(x4, y4)
 
         game_state = (self.player_info, self.wall_info, self.pit_info, self.win_info)
+        game_state = tuple(('feature' + str(idx) + '-' + '-'.join(str(x) for x in obs) for idx, obs in enumerate(game_state)))
         self.state = game_state
         self.game_status = 'in process'
         # Certain actions are not possible if the player is sitting on the edge
@@ -134,6 +135,7 @@ class GridWorld(game.AbstractGame):
 
         # Reset state
         game_state = (self.player_info, self.wall_info, self.pit_info, self.win_info)
+        game_state = tuple(('feature' + str(idx) + '-' + '-'.join(str(x) for x in obs) for idx, obs in enumerate(game_state)))
         # Certain actions are not possible if the player is sitting on the edge
         self.evaluate_and_modify_possible_actions()
         self.state = game_state
