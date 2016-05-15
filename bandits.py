@@ -44,7 +44,10 @@ class BanditAlgorithm(object):
             if q_value_table:
                 result = self.return_decision_with_max_reward(q_value_table)
         else:
-            result = (random.choice(all_possible_decisions), 0)
+            try:
+                result = (random.choice(all_possible_decisions), 0)
+            except:
+                result = (all_possible_decisions.sample(), 0)
 
         return result
 
@@ -59,9 +62,15 @@ class BanditAlgorithm(object):
                     self.policy[state] = [state[0], state[1], best_known_decision, max_reward]
 
                 else:
-                    best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
+                    try:
+                        best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
+                    except:
+                        best_known_decision, max_reward = (all_possible_decisions.sample(), 0)
 
             else:
-                best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
+                try:
+                    best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
+                except:
+                    best_known_decision, max_reward = (all_possible_decisions.sample(), 0)
 
             return best_known_decision, max_reward

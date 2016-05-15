@@ -36,6 +36,7 @@ class Model(object):
         self.base_folder_name = params['base_folder_name']
         self.design_matrix_cache = {}
         self.exists = False
+        self.params = params
 
     def finish(self):
         "Let's pickle only if we are running vw"
@@ -75,8 +76,8 @@ class Model(object):
         elif self.model_class == 'vw_python':
             self.model_path = self.base_folder_name + "/model.vw"
             self.cache_path = self.base_folder_name + "/temp.cache"
-            self.model = pyvw.vw(quiet=True, l2=0.000000001, loss_function='squared', passes=1, holdout_off=True, cache=self.cache_path,
-                                 f=self.model_path,  b=20, lrq='sdsd200') #q='::') #
+            self.model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True, cache=self.cache_path,
+                                 f=self.model_path,  b=self.params['b'], lrq=self.params['lrq'])
 
     def remove_vw_files(self):
         if os.path.isfile(self.cache_path): os.remove(self.cache_path)
