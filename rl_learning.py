@@ -229,13 +229,13 @@ def test_policy_with_random_play(game_obs, model=None):
 
 class RLAgent(object):
 
-    def __init__(self, epochs, experience_replay_size, batchsize, gamma, skip_frames):
+    def __init__(self, epochs, experience_replay_size, batchsize, gamma, skip_frames, max_steps):
         self.epochs = epochs
         self.experience_replay_size = experience_replay_size
         self.experience_replay = deque(maxlen=experience_replay_size)
         self.batchsize = batchsize
         self.gamma = gamma
-        self.max_steps = 50
+        self.max_steps = max_steps
         self.skip_frames = skip_frames
         self.frames = deque(maxlen=skip_frames)
 
@@ -285,7 +285,7 @@ class RLAgent(object):
                     break
 
                 # Store current game state
-                old_state = env.state
+                old_state = env.state if env.state else None
 
                 # Figure out best action based on policy
                 best_known_decision, known_reward = bandit_algorithm.select_decision_given_state(env.state, env.action_space, model,
@@ -297,11 +297,13 @@ class RLAgent(object):
                     self.frames.appendleft(observation)
                     if _ == (self.skip_frames-1):
                         new_state = tuple(fea for frm in self.frames for fea in frm)
+                        env.state = new_state
                         self.frames.clear()
 
                 # Experience replay storage (deque object maintains a queue, so no extra processing needed)
                 # If buffer is full, it gets overwritten due to deque magic
-                self.experience_replay.appendleft((old_state, best_known_decision, reward, new_state))
+                if old_state:
+                    self.experience_replay.appendleft((old_state, best_known_decision, reward, new_state))
 
                 # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
                 # If buffer not filled, continue and collect sample to train

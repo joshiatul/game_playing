@@ -89,7 +89,7 @@ class Model(object):
         self.y = []
         self.buffer = 0
 
-    def return_design_matrix(self, decision_state, reward=None):
+    def return_design_matrix(self, decision_state, reward=None, weight=1):
         """
         Design matrix can simply return catesian product of state and decision
         For now all categorical features
@@ -112,7 +112,7 @@ class Model(object):
                     _ = len(state[0])
                     # all_features = ['feature' + str(idx) + '-' + '-'.join(str(x) for x in obs) + '-' + decision_taken for idx, obs in enumerate(state)]
                     # Features are simply pixel-action interactions
-                    all_features = [obs + '-' + decision_taken for obs in state]
+                    all_features = [obs + '-' + str(decision_taken) for obs in state]
 
                 # Hmm design matrix for blackjack is different
                 except TypeError:
@@ -130,7 +130,8 @@ class Model(object):
                 elif self.model_class == 'vw' or self.model_class == 'vw_python':
                     input = " ".join(all_features_with_interaction)
                     if reward:
-                        output = str(reward) #+ " " + tag
+                        # TODO Pass in weight for vw
+                        output = str(reward) + " " + str(weight)
                         fv = output + " |sd " + input + '\n'
                     else:
                         fv = " |sd " + input + '\n'

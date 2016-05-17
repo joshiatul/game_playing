@@ -54,7 +54,7 @@ class BanditAlgorithm(object):
     def select_decision_given_state(self, state, all_possible_decisions, model=None, algorithm='random'):
 
         if algorithm == 'epsilon-greedy':
-            if random.random() > self.params:
+            if random.random() > self.params and state:
 
                 result = self.return_action_based_on_greedy_policy(state, model, all_possible_decisions)
                 if result:

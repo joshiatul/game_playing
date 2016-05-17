@@ -27,14 +27,14 @@ def train_rl_agent(env_name, train=True):
         from environments.gridworld import GridWorld
         env = GridWorld()
 
-    rl_params = {'epochs': 50000, 'experience_replay_size': 20, 'batchsize': 10, 'gamma': 0.1, 'skip_frames': 1}
+    rl_params = {'epochs': 50000, 'experience_replay_size': 20, 'batchsize': 10, 'gamma': 0.1, 'skip_frames': 1, 'max_steps': 30}
     model_params = {'class': 'vw_python', 'base_folder_name': env.base_folder_name, 'loss_function': 'squared',
                     'l2': 0.000000001, 'lrq': 'sdsd200', 'b': 20}
     bandit_params = 0.9
 
     # Initialize RL agent
     rl_agent = RLAgent(epochs=rl_params['epochs'], experience_replay_size=rl_params['experience_replay_size'], batchsize=rl_params['batchsize'],
-                       gamma=rl_params['gamma'], skip_frames=rl_params['skip_frames'])
+                       gamma=rl_params['gamma'], skip_frames=rl_params['skip_frames'], max_steps=rl_params['max_steps'])
     if train:
         model, bandit_algorithm = rl_agent.initialize(model_params, bandit_params)
         rl_agent.train_q_function(env, model, bandit_algorithm)
