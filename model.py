@@ -10,6 +10,7 @@ from vowpal_wabbit import pyvw
 import random
 import cPickle as pickle
 import hashlib
+import mmh3
 
 # TODO Pass learning rate
 
@@ -20,6 +21,39 @@ All models get implemented here
 4) vw-python wrapper - works wonderfully well
 5) For adding new model update design matrix, fit, predict methods
 """
+
+import cProfile
+from line_profiler import LineProfiler
+
+
+def do_cprofile(func):
+    """
+    Profile as explained here:
+    https://zapier.com/engineering/profiling-python-boss/
+    """
+    def profiled_func(*args, **kwargs):
+        profile = cProfile.Profile()
+        try:
+            profile.enable()
+            result = func(*args, **kwargs)
+            profile.disable()
+            return result
+        finally:
+            profile.print_stats()
+    return profiled_func
+
+
+def do_profile(func):
+    def profiled_func(*args, **kwargs):
+        try:
+            profiler = LineProfiler()
+            profiler.add_function(func)
+            profiler.enable_by_count()
+            return func(*args, **kwargs)
+        finally:
+            profiler.print_stats()
+    return profiled_func
+
 
 class Model(object):
     def __init__(self, params):
@@ -59,6 +93,8 @@ class Model(object):
         elif self.model_class == 'vw_python':
             self.model_path = self.base_folder_name + "/model.vw"
             self.cache_path = self.base_folder_name + "/temp.cache"
+            self.filename = self.base_folder_name + "/train.vw"
+            #self.f1 = open(self.filename, 'w')
             self.model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True, cache=self.cache_path,
                                  f=self.model_path,  b=self.params['b'], lrq=self.params['lrq'])
 
@@ -72,6 +108,7 @@ class Model(object):
         self.y = []
         self.buffer = 0
 
+    #@do_profile
     def return_design_matrix(self, decision_state, reward=None, weight=1):
         """
         Design matrix can simply return catesian product of state and decision
@@ -100,7 +137,7 @@ class Model(object):
 
                 # TODO Let's hash state feature (this is just too sparse, so why not)
                 tag = '_'.join(all_features)
-                tag = hashlib.md5(tag).hexdigest()
+                tag = str(mmh3.hash(tag)) #hashlib.md5(tag).hexdigest()
                 all_features_with_interaction = all_features + [tag]
 
                 if self.model_class == 'scikit':

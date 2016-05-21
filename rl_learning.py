@@ -6,6 +6,39 @@ import cPickle as pickle
 from collections import Counter, deque
 import numpy as np
 
+import cProfile
+from line_profiler import LineProfiler
+
+
+def do_cprofile(func):
+    """
+    Profile as explained here:
+    https://zapier.com/engineering/profiling-python-boss/
+    """
+    def profiled_func(*args, **kwargs):
+        profile = cProfile.Profile()
+        try:
+            profile.enable()
+            result = func(*args, **kwargs)
+            profile.disable()
+            return result
+        finally:
+            profile.print_stats()
+    return profiled_func
+
+
+def do_profile(func):
+    def profiled_func(*args, **kwargs):
+        try:
+            profiler = LineProfiler()
+            profiler.add_function(func)
+            profiler.enable_by_count()
+            return func(*args, **kwargs)
+        finally:
+            profiler.print_stats()
+    return profiled_func
+
+
 # TODO KILL ALL UNSED CODE!!
 # TODO Try prioritazed replay, and also target network
 # TODO Reward clipping (clip reward between [-1,1]
@@ -64,7 +97,7 @@ def train_reinforcement_learning_strategy(num_sims=1, game_obs='blackjack', mode
 
 class RLAgent(object):
 
-    def __init__(self, epochs, experience_replay_size, batchsize, gamma, skip_frames, max_steps):
+    def __init__(self, epochs, experience_replay_size, batchsize, gamma, skip_frames, max_steps, minibatch_method='random'):
         self.epochs = epochs
         self.experience_replay_size = experience_replay_size
         self.experience_replay = deque(maxlen=experience_replay_size)
@@ -73,6 +106,7 @@ class RLAgent(object):
         self.max_steps = max_steps
         self.skip_frames = skip_frames
         self.frames = deque(maxlen=skip_frames)
+        self.minibatch_method = minibatch_method
 
     def initialize(self, model_params, bandit_params, test=False):
         """
@@ -96,6 +130,7 @@ class RLAgent(object):
 
         return model, bandit_algorithm
 
+    #@do_profile
     def train_q_function(self, env, model, bandit_algorithm):
         """
         Simple temporal difference learning
@@ -118,6 +153,10 @@ class RLAgent(object):
 
                 # Check game status and breakout if you have a result
                 if done:
+                    if bandit_algorithm.params > 0.1:  # decrement epsilon over time
+                        bandit_algorithm.params -= (1.0 / self.epochs)
+
+                    print 'Total reward #: {0}'.format(total_reward)
                     break
 
                 # Store current game state
@@ -151,13 +190,7 @@ class RLAgent(object):
                 else:
 
                     # randomly sample our experience replay memory
-                    # TODO Prioratized replay can be implemented with np.random.choice
-                    # We can create Russian roulette a.k.a importance sampling based on the reward
-                    total_reward_in_ex_replay = sum(max(abs(st[2]), 0.1) for st in self.experience_replay)
-                    probs = tuple((max(abs(st[2]), 0.1)*1.0/total_reward_in_ex_replay for st in self.experience_replay))
-                    selection = set(np.random.choice(range(self.experience_replay_size), self.batchsize, probs))
-                    # minibatch = random.sample(self.experience_replay, self.batchsize)
-                    minibatch = [j for i,j in enumerate(self.experience_replay) if i in selection]
+                    minibatch = self.return_minibatch()
 
                     # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
                     for memory_lst in minibatch:
@@ -183,11 +216,6 @@ class RLAgent(object):
                     model.fit(model.X, model.y)
                     model.clean_buffer()
 
-            if bandit_algorithm.params > 0.1:  # decrement epsilon over time
-                bandit_algorithm.params -= (1.0 / self.epochs)
-
-            print 'Total reward #: {0}'.format(total_reward)
-
         model.finish()
         #elapsed_time = int(time.time() - start_time)
         return bandit_algorithm.policy, model
@@ -199,6 +227,18 @@ class RLAgent(object):
         model_stat = self.test_q_function_with_model(env, bandit_algorithm, model=model)
 
         return random_stat, model_stat
+
+    def return_minibatch(self):
+        if self.minibatch_method == 'random':
+            minibatch = random.sample(self.experience_replay, self.batchsize)
+
+        elif self.minibatch_method == 'prioritized':
+            # Simple prioritization based on magnitude of reward
+            total_reward_in_ex_replay = sum(max(abs(st[2]), 0.01) for st in self.experience_replay)
+            probs = tuple((max(abs(st[2]), 0.01) * 1.0 / total_reward_in_ex_replay for st in self.experience_replay))
+            selection = set(np.random.choice(range(self.experience_replay_size), self.batchsize, probs))
+            minibatch = [j for i, j in enumerate(self.experience_replay) if i in selection]
+        return minibatch
 
     def test_q_function_with_model(self, env, bandit_algorithm, model='random'):
         result = Counter()

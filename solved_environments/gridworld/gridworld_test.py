@@ -11,7 +11,7 @@ def train_rl_agent(env_name, train=True):
         from environments.gridworld import GridWorld
         env = GridWorld()
 
-    rl_params = {'epochs': 60000, 'experience_replay_size': 200, 'batchsize': 80, 'gamma': 0.1, 'skip_frames': 1, 'max_steps': 30}
+    rl_params = {'epochs': 60000, 'experience_replay_size': 200, 'batchsize': 20, 'gamma': 0.1, 'skip_frames': 1, 'max_steps': 30}
     model_params = {'class': 'vw_python', 'base_folder_name': env.base_folder_name, 'loss_function': 'squared',
                     'l2': 0.0000000001, 'lrq': 'sdsd200', 'b': 20}
     bandit_params = 0.9

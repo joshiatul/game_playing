@@ -5,6 +5,38 @@ All exploration algorithms live here
 We will start with Epsilon-greedy but plan to add softmax and others
 """
 
+import cProfile
+from line_profiler import LineProfiler
+
+
+def do_cprofile(func):
+    """
+    Profile as explained here:
+    https://zapier.com/engineering/profiling-python-boss/
+    """
+    def profiled_func(*args, **kwargs):
+        profile = cProfile.Profile()
+        try:
+            profile.enable()
+            result = func(*args, **kwargs)
+            profile.disable()
+            return result
+        finally:
+            profile.print_stats()
+    return profiled_func
+
+
+def do_profile(func):
+    def profiled_func(*args, **kwargs):
+        try:
+            profiler = LineProfiler()
+            profiler.add_function(func)
+            profiler.enable_by_count()
+            return func(*args, **kwargs)
+        finally:
+            profiler.print_stats()
+    return profiled_func
+
 class DecisionState(object):
     def __init__(self):
         self.count = 0
@@ -18,6 +50,8 @@ class BanditAlgorithm(object):
         self.decisions = None
 
     # TODO This may belong outside bandit
+
+    #@do_profile
     def return_decision_reward_tuples(self, state, model, all_possible_decisions):
         q_value_table = []
         for decision in all_possible_decisions:
@@ -25,16 +59,20 @@ class BanditAlgorithm(object):
                 decision_state = (state, decision)
                 feature_vector, y = model.return_design_matrix(decision_state)
                 reward = model.predict(feature_vector)
-                q_value_table.append((decision, reward))
+                #q_value_table.append((decision, reward))
+                q_value_table.append(reward)
 
         return q_value_table
 
     # TODO This may belong outside bandit
+    # TODO FIX THIS
     def return_decision_with_max_reward(self, q_value_table):
-        q_value_table.sort(key=lambda tup: tup[1], reverse=True)
-        return q_value_table[0]
+        max_value = max(q_value_table)
+        max_index = q_value_table.index(max_value)
+        #q_value_table.sort(key=lambda tup: tup[1], reverse=True)
+        return max_value, max_index
 
-
+    #@do_profile
     def return_action_based_on_greedy_policy(self, state, model, all_possible_decisions):
 
         if model.exists and state:
@@ -42,7 +80,8 @@ class BanditAlgorithm(object):
             q_value_table = self.return_decision_reward_tuples(state, model, all_possible_decisions)
             # Store policy learned so far
             if q_value_table:
-                result = self.return_decision_with_max_reward(q_value_table)
+                max_value, max_index = self.return_decision_with_max_reward(q_value_table)
+                result = (all_possible_decisions[max_index], max_value)
         else:
             try:
                 result = (random.choice(all_possible_decisions), 0)
