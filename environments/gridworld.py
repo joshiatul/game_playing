@@ -111,7 +111,7 @@ class GridWorld(game.AbstractGame):
     def complete_one_episode(self):
         pass
 
-    def step(self, action):
+    def step(self, action, skip_frames=1):
         self.player_old_state = self.player_info
         if action == 'left':
             new_loc = self.coordinates(self.player_info.x, self.player_info.y-1)

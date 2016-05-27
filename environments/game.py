@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 import os
 from scipy import misc
-from collections import deque
+import numpy as np
 
 class AbstractGame(object):
 
@@ -26,7 +26,7 @@ class AbstractGame(object):
         pass
 
     @abstractmethod
-    def step(self, action):
+    def step(self, action, skip_frames=0):
         """
         This should update state after interacting with the
         environment. Mostly used for temporal difference learning
@@ -44,9 +44,12 @@ class AbstractGame(object):
         if size:
             grayscale_screen = self._resize_image(grayscale_screen, size)
 
-        return grayscale_screen
+        # Also return only non-zero pixels of the screen
+        non_zero_pixels_of_grayscale_screen = np.nonzero(grayscale_screen)
 
-    def _convert_rgb_to_grayscale(rgb_image):
+        return non_zero_pixels_of_grayscale_screen
+
+    def _convert_rgb_to_grayscale(self, rgb_image):
         """
         Convert rgb image to to grayscale
         (assuming rgb_image is ndarray)

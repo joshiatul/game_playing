@@ -62,7 +62,7 @@ def train_reinforcement_learning_strategy(num_sims=1, game_obs='blackjack', mode
 
 class RLAgent(object):
 
-    def __init__(self, epochs, experience_replay_size, batchsize, gamma, skip_frames, max_steps, minibatch_method='random'):
+    def __init__(self, epochs, experience_replay_size, batchsize, gamma, skip_frames, max_steps, minibatch_method='random', train_model_after_samples=1):
         self.epochs = epochs
         self.experience_replay_size = experience_replay_size
         self.experience_replay = deque(maxlen=experience_replay_size)
@@ -72,6 +72,7 @@ class RLAgent(object):
         self.skip_frames = skip_frames
         self.frames = deque(maxlen=skip_frames)
         self.minibatch_method = minibatch_method
+        self.train_model_after_samples = train_model_after_samples
 
     def initialize(self, model_params, bandit_params, test=False):
         """
@@ -124,7 +125,7 @@ class RLAgent(object):
                         avg_batch_mse = sum(batch_mse_stat)*1.0 / len(batch_mse_stat)
                     else:
                         avg_batch_mse = 0
-                    res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, total_steps, total_reward, avg_batch_mse, len(batch_mse_stat))
+                    res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, move, total_reward, avg_batch_mse, len(batch_mse_stat))
                     print res_line
                     result_file.write(res_line)
                     break
@@ -136,18 +137,8 @@ class RLAgent(object):
                 best_known_decision, known_reward = bandit_algorithm.select_decision_given_state(env.state, env.action_space, model,
                                                                                                 algorithm='epsilon-greedy')
 
-                cumu_reward = 0
-                for _ in xrange(self.skip_frames):
-                    # Make move to get to a new state and observe reward (Remember this could be a terminal state)
-                    observation, reward, done, info = env.step(best_known_decision)
-                    total_reward += reward
-                    cumu_reward += reward
-                    total_steps += 1
-                    self.frames.appendleft(observation)
-                    if _ == (self.skip_frames-1):
-                        new_state = tuple(fea for frm in self.frames for fea in frm)
-                        env.state = new_state
-                        self.frames.clear()
+                new_state, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
+                total_reward += cumu_reward
 
                 # Experience replay storage (deque object maintains a queue, so no extra processing needed)
                 # If buffer is full, it gets overwritten due to deque magic
@@ -186,9 +177,10 @@ class RLAgent(object):
                         model.y.append(y_new)
 
                     # We are retraining in every single epoch, but with some subset of all samples
-                    batch_mse = model.fit(model.X, model.y)
-                    batch_mse_stat.append(batch_mse)
-                    model.clean_buffer()
+                    if len(model.X) > self.train_model_after_samples:
+                        batch_mse = model.fit(model.X, model.y)
+                        batch_mse_stat.append(batch_mse)
+                        model.clean_buffer()
 
         model.finish()
         result_file.close()
