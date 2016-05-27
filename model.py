@@ -22,38 +22,6 @@ All models get implemented here
 5) For adding new model update design matrix, fit, predict methods
 """
 
-import cProfile
-from line_profiler import LineProfiler
-
-
-def do_cprofile(func):
-    """
-    Profile as explained here:
-    https://zapier.com/engineering/profiling-python-boss/
-    """
-    def profiled_func(*args, **kwargs):
-        profile = cProfile.Profile()
-        try:
-            profile.enable()
-            result = func(*args, **kwargs)
-            profile.disable()
-            return result
-        finally:
-            profile.print_stats()
-    return profiled_func
-
-
-def do_profile(func):
-    def profiled_func(*args, **kwargs):
-        try:
-            profiler = LineProfiler()
-            profiler.add_function(func)
-            profiler.enable_by_count()
-            return func(*args, **kwargs)
-        finally:
-            profiler.print_stats()
-    return profiled_func
-
 
 class Model(object):
     def __init__(self, params):
@@ -96,7 +64,7 @@ class Model(object):
             self.filename = self.base_folder_name + "/train.vw"
             #self.f1 = open(self.filename, 'w')
             self.model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True, cache=self.cache_path,
-                                 f=self.model_path,  b=self.params['b'], lrq=self.params['lrq'])
+                                 f=self.model_path,  b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'])
 
     def remove_vw_files(self):
         if os.path.isfile(self.cache_path): os.remove(self.cache_path)
@@ -119,7 +87,7 @@ class Model(object):
 
         else:
             train_test_mode = 'train' if reward else 'test'
-            cache_key = (decision_state, train_test_mode)
+            cache_key = str(mmh3.hash128(repr((decision_state, train_test_mode))))
             if cache_key in self.design_matrix_cache:
                 fv, reward = self.design_matrix_cache[cache_key]
 
@@ -137,7 +105,7 @@ class Model(object):
 
                 # TODO Let's hash state feature (this is just too sparse, so why not)
                 tag = '_'.join(all_features)
-                tag = str(mmh3.hash(tag)) #hashlib.md5(tag).hexdigest()
+                tag = str(mmh3.hash128(tag))
                 all_features_with_interaction = all_features + [tag]
 
                 if self.model_class == 'scikit':
@@ -148,6 +116,7 @@ class Model(object):
                 elif self.model_class == 'vw' or self.model_class == 'vw_python':
                     input = " ".join(all_features_with_interaction)
                     if reward:
+                        if reward > 0: weight = 5
                         output = str(reward) + " " + str(weight)
                         fv = output + " |sd " + input + '\n'
                     else:
@@ -192,6 +161,8 @@ class Model(object):
                 random.shuffle(X)
                 res = [fv.learn() for fv in X]
             self.exists = True
+            batch_mse = sum(fv.get_loss()**2 for fv in X) / (len(X)*1.0)
+            return batch_mse
 
     def predict(self, test):
         if self.model_class == 'scikit':

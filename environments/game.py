@@ -1,5 +1,7 @@
 from abc import ABCMeta, abstractmethod
 import os
+from scipy import misc
+from collections import deque
 
 class AbstractGame(object):
 
@@ -31,3 +33,34 @@ class AbstractGame(object):
         :return: <observation, reward, done, info>
         """
         pass
+
+    # --------- Methods for Atari Games --------- #
+    def preprocess_screen(self, original_screen, size=None):
+        """
+        :param size:
+        :return:
+        """
+        grayscale_screen = self._convert_rgb_to_grayscale(original_screen)
+        if size:
+            grayscale_screen = self._resize_image(grayscale_screen, size)
+
+        return grayscale_screen
+
+    def _convert_rgb_to_grayscale(rgb_image):
+        """
+        Convert rgb image to to grayscale
+        (assuming rgb_image is ndarray)
+        :return:
+        """
+        grayscale_image = rgb_image.mean(axis=2)
+        # grayscale_image = np.ma.average(rgb_image, axis=2, weights=[0.299, 0.587 ,0.114]) # Weighted average
+        return grayscale_image
+
+    def _resize_image(self, original_image, size):
+        """
+        Resize imgae
+        :param original_image:
+        :param size:
+        :return:
+        """
+        return misc.imresize(original_image, size)

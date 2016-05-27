@@ -6,41 +6,6 @@ import cPickle as pickle
 from collections import Counter, deque
 import numpy as np
 
-import cProfile
-from line_profiler import LineProfiler
-
-
-def do_cprofile(func):
-    """
-    Profile as explained here:
-    https://zapier.com/engineering/profiling-python-boss/
-    """
-    def profiled_func(*args, **kwargs):
-        profile = cProfile.Profile()
-        try:
-            profile.enable()
-            result = func(*args, **kwargs)
-            profile.disable()
-            return result
-        finally:
-            profile.print_stats()
-    return profiled_func
-
-
-def do_profile(func):
-    def profiled_func(*args, **kwargs):
-        try:
-            profiler = LineProfiler()
-            profiler.add_function(func)
-            profiler.enable_by_count()
-            return func(*args, **kwargs)
-        finally:
-            profiler.print_stats()
-    return profiled_func
-
-
-# TODO KILL ALL UNSED CODE!!
-# TODO Try prioritazed replay, and also target network
 # TODO Reward clipping (clip reward between [-1,1]
 
 
@@ -137,16 +102,15 @@ class RLAgent(object):
         with experience-replay
         :return:
         """
+        result_file = open(model.base_folder_name + '/result.data', 'w')
         for episode in xrange(self.epochs):
 
             # Initialize game and parameters for this epoch
             env.reset()
             done = None
             total_reward = 0
-
-            # Reset epsilon
-            #banditAlgorithm.params = epsilon
-            print 'Game #: {0}'.format(episode)
+            total_steps = 0
+            batch_mse_stat = []
 
             # Start playing the game
             for move in xrange(self.max_steps):
@@ -156,7 +120,13 @@ class RLAgent(object):
                     if bandit_algorithm.params > 0.1:  # decrement epsilon over time
                         bandit_algorithm.params -= (1.0 / self.epochs)
 
-                    print 'Total reward #: {0}'.format(total_reward)
+                    if batch_mse_stat:
+                        avg_batch_mse = sum(batch_mse_stat)*1.0 / len(batch_mse_stat)
+                    else:
+                        avg_batch_mse = 0
+                    res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, total_steps, total_reward, avg_batch_mse, len(batch_mse_stat))
+                    print res_line
+                    result_file.write(res_line)
                     break
 
                 # Store current game state
@@ -166,10 +136,13 @@ class RLAgent(object):
                 best_known_decision, known_reward = bandit_algorithm.select_decision_given_state(env.state, env.action_space, model,
                                                                                                 algorithm='epsilon-greedy')
 
+                cumu_reward = 0
                 for _ in xrange(self.skip_frames):
                     # Make move to get to a new state and observe reward (Remember this could be a terminal state)
                     observation, reward, done, info = env.step(best_known_decision)
                     total_reward += reward
+                    cumu_reward += reward
+                    total_steps += 1
                     self.frames.appendleft(observation)
                     if _ == (self.skip_frames-1):
                         new_state = tuple(fea for frm in self.frames for fea in frm)
@@ -179,7 +152,7 @@ class RLAgent(object):
                 # Experience replay storage (deque object maintains a queue, so no extra processing needed)
                 # If buffer is full, it gets overwritten due to deque magic
                 if old_state and new_state:
-                    self.experience_replay.appendleft((old_state, best_known_decision, reward, new_state))
+                    self.experience_replay.appendleft((old_state, best_known_decision, cumu_reward, new_state))
 
                 # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
                 # If buffer not filled, continue and collect sample to train
@@ -213,10 +186,12 @@ class RLAgent(object):
                         model.y.append(y_new)
 
                     # We are retraining in every single epoch, but with some subset of all samples
-                    model.fit(model.X, model.y)
+                    batch_mse = model.fit(model.X, model.y)
+                    batch_mse_stat.append(batch_mse)
                     model.clean_buffer()
 
         model.finish()
+        result_file.close()
         #elapsed_time = int(time.time() - start_time)
         return bandit_algorithm.policy, model
 
@@ -234,8 +209,8 @@ class RLAgent(object):
 
         elif self.minibatch_method == 'prioritized':
             # Simple prioritization based on magnitude of reward
-            total_reward_in_ex_replay = sum(max(abs(st[2]), 0.01) for st in self.experience_replay)
-            probs = tuple((max(abs(st[2]), 0.01) * 1.0 / total_reward_in_ex_replay for st in self.experience_replay))
+            total_reward_in_ex_replay = sum(max(abs(st[2]), 0.00001) for st in self.experience_replay)
+            probs = tuple((max(abs(st[2]), 0.00001) * 1.0 / total_reward_in_ex_replay for st in self.experience_replay))
             selection = set(np.random.choice(range(self.experience_replay_size), self.batchsize, probs))
             minibatch = [j for i, j in enumerate(self.experience_replay) if i in selection]
         return minibatch

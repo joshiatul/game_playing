@@ -5,37 +5,6 @@ All exploration algorithms live here
 We will start with Epsilon-greedy but plan to add softmax and others
 """
 
-import cProfile
-from line_profiler import LineProfiler
-
-
-def do_cprofile(func):
-    """
-    Profile as explained here:
-    https://zapier.com/engineering/profiling-python-boss/
-    """
-    def profiled_func(*args, **kwargs):
-        profile = cProfile.Profile()
-        try:
-            profile.enable()
-            result = func(*args, **kwargs)
-            profile.disable()
-            return result
-        finally:
-            profile.print_stats()
-    return profiled_func
-
-
-def do_profile(func):
-    def profiled_func(*args, **kwargs):
-        try:
-            profiler = LineProfiler()
-            profiler.add_function(func)
-            profiler.enable_by_count()
-            return func(*args, **kwargs)
-        finally:
-            profiler.print_stats()
-    return profiled_func
 
 class DecisionState(object):
     def __init__(self):
@@ -98,7 +67,9 @@ class BanditAlgorithm(object):
                 result = self.return_action_based_on_greedy_policy(state, model, all_possible_decisions)
                 if result:
                     best_known_decision, max_reward = result
-                    self.policy[state] = [state[0], state[1], best_known_decision, max_reward]
+
+                    # Probably no need to save policy (for environments other than blackjack)
+                    # self.policy[state] = [state[0], state[1], best_known_decision, max_reward]
 
                 else:
                     try:
