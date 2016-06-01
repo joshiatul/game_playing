@@ -117,8 +117,7 @@ class RLAgent(object):
 
                 # Check game status and breakout if you have a result
                 if done:
-                    if bandit_algorithm.params > 0.1:  # decrement epsilon over time
-                        bandit_algorithm.params -= (1.0 / self.epochs)
+                    bandit_algorithm.decrement_epsilon(self.epochs)
 
                     if batch_mse_stat:
                         avg_batch_mse = sum(batch_mse_stat) * 1.0 / len(batch_mse_stat)

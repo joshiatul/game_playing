@@ -11,6 +11,7 @@ class DecisionState(object):
         self.count = 0
         self.value_estimate = 0
 
+
 class BanditAlgorithm(object):
     def __init__(self, params=0):
         self.decision_states = {}
@@ -19,8 +20,6 @@ class BanditAlgorithm(object):
         self.decisions = None
 
     # TODO This may belong outside bandit
-
-    #@do_profile
     def return_decision_reward_tuples(self, state, model, all_possible_decisions):
         q_value_table = []
         for decision in all_possible_decisions:
@@ -28,24 +27,21 @@ class BanditAlgorithm(object):
                 decision_state = (state, decision)
                 feature_vector, y = model.return_design_matrix(decision_state)
                 reward = model.predict(feature_vector)
-                #q_value_table.append((decision, reward))
                 q_value_table.append(reward)
 
         return q_value_table
 
     # TODO This may belong outside bandit
-    # TODO FIX THIS
     def return_decision_with_max_reward(self, q_value_table):
         max_value = max(q_value_table)
         max_index = q_value_table.index(max_value)
-        #q_value_table.sort(key=lambda tup: tup[1], reverse=True)
+        # q_value_table.sort(key=lambda tup: tup[1], reverse=True)
         return max_value, max_index
 
-    #@do_profile
     def return_action_based_on_greedy_policy(self, state, model, all_possible_decisions):
 
         if model.exists and state:
-            result=()
+            result = ()
             q_value_table = self.return_decision_reward_tuples(state, model, all_possible_decisions)
             # Store policy learned so far
             if q_value_table:
@@ -84,3 +80,7 @@ class BanditAlgorithm(object):
                     best_known_decision, max_reward = (all_possible_decisions.sample(), 0)
 
             return best_known_decision, max_reward
+
+    def decrement_epsilon(self, epochs):
+        if self.params > 0.1:
+            self.params -= (1.0 / epochs)
