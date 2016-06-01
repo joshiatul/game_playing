@@ -9,8 +9,8 @@ import math
 def flatten_list_of_lists(list_of_lists):
     return [val for sublist in list_of_lists for val in sublist]
 
-class GridWorld(game.AbstractGame):
 
+class GridWorld(game.AbstractGame):
     def __init__(self):
         self.action_space = ['up', 'down', 'left', 'right']
         self.all_decisions = ['up', 'down', 'left', 'right']
@@ -55,7 +55,6 @@ class GridWorld(game.AbstractGame):
 
         self.action_space = [i for i in self.all_decisions if i not in remove_actions]
 
-
     def reset(self, full_rnd=True):
         """
         What exactly we know about the game beforehand?
@@ -67,24 +66,24 @@ class GridWorld(game.AbstractGame):
         """
 
         if full_rnd:
-            random_coors = [self.coordinates(i,j) for i,j in zip(random.sample(xrange(0,4), 4), [random.randint(0,3) for _ in xrange(0, 4)])]
+            random_coors = [self.coordinates(i, j) for i, j in zip(random.sample(xrange(0, 4), 4), [random.randint(0, 3) for _ in xrange(0, 4)])]
             self.player_info, self.wall_info, self.pit_info, self.win_info = random_coors
 
         # Else generate only player and win randomly
         else:
-            x1, y1 = 1,3
+            x1, y1 = 1, 3
             self.wall_info = self.coordinates(x1, y1)
-            x2, y2 = 2,3
+            x2, y2 = 2, 3
             self.pit_info = self.coordinates(x2, y2)
 
-            x3, y3 = (random.randint(0,3), random.randint(0,3))
+            x3, y3 = (random.randint(0, 3), random.randint(0, 3))
             while (x1, y1) == (x3, y3):
-                x3, y3 = (random.randint(0,3), random.randint(0,3))
+                x3, y3 = (random.randint(0, 3), random.randint(0, 3))
             self.player_info = self.coordinates(x3, y3)
 
-            x4, y4 = (random.randint(0,3), random.randint(0,3))
+            x4, y4 = (random.randint(0, 3), random.randint(0, 3))
             while (x2, y2) == (x4, y4):
-                x4, y4 = (random.randint(0,3), random.randint(0,3))
+                x4, y4 = (random.randint(0, 3), random.randint(0, 3))
             self.win_info = self.coordinates(x4, y4)
 
         game_state = (self.player_info, self.wall_info, self.pit_info, self.win_info)
@@ -94,8 +93,8 @@ class GridWorld(game.AbstractGame):
         # Certain actions are not possible if the player is sitting on the edge
         self.evaluate_and_modify_possible_actions()
 
-    def display_grid(self):
-        grid = np.zeros((4,4), dtype='<U2')
+    def render(self):
+        grid = np.zeros((4, 4), dtype='<U2')
 
         grid[self.player_info.x, self.player_info.y] = 'P'
         grid[self.wall_info.x, self.wall_info.y] = 'W'
@@ -107,29 +106,28 @@ class GridWorld(game.AbstractGame):
 
         print pd.DataFrame(grid)
 
-
     def complete_one_episode(self):
         pass
 
     def step(self, action, skip_frames=1):
         self.player_old_state = self.player_info
         if action == 'left':
-            new_loc = self.coordinates(self.player_info.x, self.player_info.y-1)
+            new_loc = self.coordinates(self.player_info.x, self.player_info.y - 1)
             if new_loc != self.wall_info and new_loc.y >= 0:
                 self.player_info = new_loc
 
         elif action == 'right':
-            new_loc = self.coordinates(self.player_info.x, self.player_info.y+1)
+            new_loc = self.coordinates(self.player_info.x, self.player_info.y + 1)
             if new_loc != self.wall_info and new_loc.y <= 3:
                 self.player_info = new_loc
 
         elif action == 'up':
-            new_loc = self.coordinates(self.player_info.x-1, self.player_info.y)
+            new_loc = self.coordinates(self.player_info.x - 1, self.player_info.y)
             if new_loc != self.wall_info and new_loc.x >= 0:
                 self.player_info = new_loc
 
         elif action == 'down':
-            new_loc = self.coordinates(self.player_info.x+1, self.player_info.y)
+            new_loc = self.coordinates(self.player_info.x + 1, self.player_info.y)
             if new_loc != self.wall_info and new_loc.x <= 3:
                 self.player_info = new_loc
 
@@ -156,27 +154,27 @@ class GridWorld(game.AbstractGame):
         elif self.player_info == self.player_old_state:
             return -10
         else:
-            # Return distance from win (player looks at screen so i think this is fare)
-            return -(math.sqrt((self.player_info.x - self.win_info.x)**2 + (self.player_info.y - self.win_info.y)**2))
-            #return -1
+            # Return distance from win (player looks at screen so i think this is fair)
+            return -(math.sqrt((self.player_info.x - self.win_info.x) ** 2 + (self.player_info.y - self.win_info.y) ** 2))
+            # return -1
 
 
 if __name__ == "__main__":
     gridworld = GridWorld()
     gridworld.reset()
     print gridworld.player_info
-    gridworld.display_grid()
+    gridworld.render()
     reward = gridworld.step('down')
     print gridworld.player_info
-    gridworld.display_grid()
+    gridworld.render()
     reward = gridworld.step('down')
     print gridworld.player_info
-    print gridworld.display_grid()
+    print gridworld.render()
     reward = gridworld.step('down')
     print gridworld.player_info
-    print gridworld.display_grid()
+    print gridworld.render()
     reward = gridworld.step('right')
     print gridworld.player_info
-    print gridworld.display_grid()
+    print gridworld.render()
 
     print reward

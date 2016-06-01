@@ -69,3 +69,4 @@ target/
 *.cache
 *.writing
 .idea/
+*.data

@@ -6,6 +6,7 @@ import cPickle as pickle
 from collections import Counter, deque
 import numpy as np
 
+
 # TODO Reward clipping (clip reward between [-1,1]
 
 
@@ -61,18 +62,16 @@ def train_reinforcement_learning_strategy(num_sims=1, game_obs='blackjack', mode
 
 
 class RLAgent(object):
-
-    def __init__(self, epochs, experience_replay_size, batchsize, gamma, skip_frames, max_steps, minibatch_method='random', train_model_after_samples=1):
+    def __init__(self, epochs, experience_replay_size, batchsize, gamma, skip_frames, max_steps, minibatch_method='random',
+                 train_model_after_samples=1):
         self.epochs = epochs
-        self.experience_replay_size = experience_replay_size
-        self.experience_replay = deque(maxlen=experience_replay_size)
-        self.batchsize = batchsize
         self.gamma = gamma
         self.max_steps = max_steps
         self.skip_frames = skip_frames
         self.frames = deque(maxlen=skip_frames)
-        self.minibatch_method = minibatch_method
         self.train_model_after_samples = train_model_after_samples
+        self.experience_replay_obs = ExperienceReplay(type='deque', batchsize=batchsize, experience_replay_size=experience_replay_size,
+                                                      minibatch_method=minibatch_method)
 
     def initialize(self, model_params, bandit_params, test=False):
         """
@@ -87,6 +86,7 @@ class RLAgent(object):
             model.initialize()
 
         else:
+            # TODO Instantiate a model based on train or test (Move the following in Model)
             model = pickle.load(open(model_params['base_folder_name'] + '/model_obs.pkl', mode='rb'))
             if model.model_class == 'vw_python':
                 from vowpal_wabbit import pyvw
@@ -96,7 +96,6 @@ class RLAgent(object):
 
         return model, bandit_algorithm
 
-    #@do_profile
     def train_q_function(self, env, model, bandit_algorithm):
         """
         Simple temporal difference learning
@@ -122,10 +121,13 @@ class RLAgent(object):
                         bandit_algorithm.params -= (1.0 / self.epochs)
 
                     if batch_mse_stat:
-                        avg_batch_mse = sum(batch_mse_stat)*1.0 / len(batch_mse_stat)
+                        avg_batch_mse = sum(batch_mse_stat) * 1.0 / len(batch_mse_stat)
                     else:
                         avg_batch_mse = 0
-                    res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, move, total_reward, avg_batch_mse, len(batch_mse_stat))
+                    res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, move,
+                                                                                                                            total_reward,
+                                                                                                                            avg_batch_mse,
+                                                                                                                            len(batch_mse_stat))
                     print res_line
                     result_file.write(res_line)
                     break
@@ -135,26 +137,23 @@ class RLAgent(object):
 
                 # Figure out best action based on policy
                 best_known_decision, known_reward = bandit_algorithm.select_decision_given_state(env.state, env.action_space, model,
-                                                                                                algorithm='epsilon-greedy')
+                                                                                                 algorithm='epsilon-greedy')
 
                 new_state, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
                 total_reward += cumu_reward
 
-                # Experience replay storage (deque object maintains a queue, so no extra processing needed)
-                # If buffer is full, it gets overwritten due to deque magic
                 if old_state and new_state:
-                    self.experience_replay.appendleft((old_state, best_known_decision, cumu_reward, new_state))
+                    self.experience_replay_obs.store_for_experience_replay((old_state, best_known_decision, cumu_reward, new_state))
 
                 # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
-                # If buffer not filled, continue and collect sample to train
-                if (len(self.experience_replay) < self.experience_replay_size):
+                if not self.experience_replay_obs.start_training():
                     continue
 
                 # Start training only after buffer is full
                 else:
 
                     # randomly sample our experience replay memory
-                    minibatch = self.return_minibatch()
+                    minibatch = self.experience_replay_obs.return_minibatch()
 
                     # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
                     for memory_lst in minibatch:
@@ -184,49 +183,29 @@ class RLAgent(object):
 
         model.finish()
         result_file.close()
-        #elapsed_time = int(time.time() - start_time)
         return bandit_algorithm.policy, model
 
-    def test_q_function(self, env, model, bandit_algorithm):
+    def test_q_function(self, env, model, bandit_algorithm, test_games, render=False):
         print "---------- Testing policy:-----------"
 
-        random_stat = self.test_q_function_with_model(env, bandit_algorithm, model='random')
-        model_stat = self.test_q_function_with_model(env, bandit_algorithm, model=model)
+        random_stat = self.test_q_function_with_model(env, bandit_algorithm, test_games, model='random', render=False)
+        model_stat = self.test_q_function_with_model(env, bandit_algorithm, test_games, model=model, render=render)
 
         return random_stat, model_stat
 
-    def return_minibatch(self):
-        if self.minibatch_method == 'random':
-            minibatch = random.sample(self.experience_replay, self.batchsize)
-
-        elif self.minibatch_method == 'prioritized':
-            # Simple prioritization based on magnitude of reward
-            total_reward_in_ex_replay = sum(max(abs(st[2]), 0.00001) for st in self.experience_replay)
-            probs = tuple((max(abs(st[2]), 0.00001) * 1.0 / total_reward_in_ex_replay for st in self.experience_replay))
-            selection = set(np.random.choice(range(self.experience_replay_size), self.batchsize, probs))
-            minibatch = [j for i, j in enumerate(self.experience_replay) if i in selection]
-        return minibatch
-
-    def test_q_function_with_model(self, env, bandit_algorithm, model='random'):
+    def test_q_function_with_model(self, env, bandit_algorithm, test_games=1, model='random', render=False):
         result = Counter()
-        for episode in xrange(100):
+        for episode in xrange(test_games):
             env.reset()
             done = False
             per_episode_result = Counter()
-            for mv in xrange(1, 11):
-                if model=='random':
+            for mv in xrange(1, self.max_steps):
+                if render: env.render()
+                if model == 'random':
                     action = random.choice(env.action_space)
                 else:
                     action, value_estimate = bandit_algorithm.return_action_based_on_greedy_policy(env.state, model, env.action_space)
-
-                for _ in xrange(self.skip_frames):
-                    observation, reward, done, info = env.step(action)
-                    per_episode_result[episode] += reward
-                    self.frames.appendleft(observation)
-                    if _ == (self.skip_frames - 1):
-                        new_state = tuple(fea for frm in self.frames for fea in frm)
-                        env.state = new_state
-                        self.frames.clear()
+                    observation, reward, done, info = env.step(action, self.skip_frames)
 
                 if done:
                     if reward > 0:
@@ -238,5 +217,51 @@ class RLAgent(object):
             if not done:
                 result['in process'] += 1
 
-        result['average reward'] = sum(per_episode_result.itervalues()) / 100
+        result['average reward'] = sum(per_episode_result.itervalues()) / test_games
         return result
+
+
+class ExperienceReplay(object):
+    def __init__(self, type, batchsize, experience_replay_size, minibatch_method='random'):
+        self.type = type
+        self.experience_replay_size = experience_replay_size
+        self.minibatch_method = minibatch_method
+        self.experience_replay = None
+        self.batchsize = batchsize
+        self.initialize()
+
+    def initialize(self):
+        if self.type == 'deque':
+            self.experience_replay = deque(maxlen=self.experience_replay_size)
+
+        elif self.type == 'dict':
+            self.experience_replay = {}
+
+    def store_for_experience_replay(self, state_tuple):
+        if self.type == 'deque':
+            self.experience_replay.appendleft(state_tuple)
+
+        elif self.type == 'dict':
+            pass
+
+    def return_minibatch(self):
+        if self.minibatch_method == 'random':
+            minibatch = random.sample(self.experience_replay, self.batchsize)
+
+        elif self.minibatch_method == 'prioritized':
+            # Simple prioritization based on magnitude of reward
+            total_reward_in_ex_replay = sum(max(abs(st[2]), (1.0 / self.experience_replay_size)) for st in self.experience_replay)
+            probs = tuple((max(abs(st[2]), (1.0 / self.experience_replay_size)) * 1.0 / total_reward_in_ex_replay for st in self.experience_replay))
+            selection = set(np.random.choice(range(self.experience_replay_size), self.batchsize, probs))
+            minibatch = [j for i, j in enumerate(self.experience_replay) if i in selection]
+
+        return minibatch
+
+    def start_training(self):
+        """
+        Start training only if experience replay memory is full
+        """
+        if (len(self.experience_replay) < self.experience_replay_size):
+            return False
+        else:
+            return True

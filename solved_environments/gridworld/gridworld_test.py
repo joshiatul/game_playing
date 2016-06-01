@@ -6,7 +6,6 @@ from bandits import BanditAlgorithm
 
 
 def train_rl_agent(env_name, train=True):
-
     if env_name == 'gridworld':
         from environments.gridworld import GridWorld
         env = GridWorld()
@@ -25,11 +24,11 @@ def train_rl_agent(env_name, train=True):
         rl_agent.train_q_function(env, model, bandit_algorithm)
 
     else:
-        #random_stat, model_stat = rl.test_policy_with_random_play(env)
         model, bandit_algorithm = rl_agent.initialize(model_params, bandit_params, test=True)
-        random_stat, model_stat = rl_agent.test_q_function(env, model, bandit_algorithm)
+        random_stat, model_stat = rl_agent.test_q_function(env, model, bandit_algorithm, test_games=1, render=True)
         print random_stat
         print model_stat
 
-#train_rl_agent(env_name='gridworld', train=True)
+
+# train_rl_agent(env_name='gridworld', train=True)
 train_rl_agent(env_name='gridworld', train=False)

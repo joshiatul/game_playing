@@ -3,8 +3,8 @@ import os
 from scipy import misc
 import numpy as np
 
-class AbstractGame(object):
 
+class AbstractGame(object):
     __metaclass__ = ABCMeta
 
     def __init__(self, name):
@@ -45,7 +45,8 @@ class AbstractGame(object):
             grayscale_screen = self._resize_image(grayscale_screen, size)
 
         # Also return only non-zero pixels of the screen
-        non_zero_pixels_of_grayscale_screen = np.nonzero(grayscale_screen)
+        grayscale_screen = grayscale_screen.flatten()
+        non_zero_pixels_of_grayscale_screen = np.nonzero(grayscale_screen)[0]
 
         return non_zero_pixels_of_grayscale_screen
 
