@@ -141,7 +141,7 @@ class RLAgent(object):
                 total_reward += cumu_reward
 
                 if old_state and new_state:
-                    self.experience_replay_obs.store_for_experience_replay((old_state, best_known_decision, cumu_reward, new_state))
+                    self.experience_replay_obs.store_for_experience_replay((old_state, best_known_decision, cumu_reward, new_state, done))
 
                 # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
                 if not self.experience_replay_obs.start_training():
@@ -155,10 +155,10 @@ class RLAgent(object):
 
                     # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
                     for memory_lst in minibatch:
-                        old_state_er, action_er, reward_er, new_state_er = memory_lst
+                        old_state_er, action_er, reward_er, new_state_er, done_er = memory_lst
 
                         # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
-                        if not done and model.exists:  # non-terminal state
+                        if not done_er and model.exists:  # non-terminal state
                             # Get value estimate for that best action and update EXISTING reward
                             result = bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, model, env.action_space)
                             max_reward = result[1]
