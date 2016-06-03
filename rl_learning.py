@@ -62,9 +62,8 @@ def train_reinforcement_learning_strategy(num_sims=1, game_obs='blackjack', mode
 
 
 class RLAgent(object):
-    def __init__(self, epochs, experience_replay_size, batchsize, gamma, skip_frames, max_steps, minibatch_method='random',
+    def __init__(self, experience_replay_size, batchsize, gamma, skip_frames, max_steps, minibatch_method='random',
                  train_model_after_samples=1):
-        self.epochs = epochs
         self.gamma = gamma
         self.max_steps = max_steps
         self.skip_frames = skip_frames
@@ -96,14 +95,14 @@ class RLAgent(object):
 
         return model, bandit_algorithm
 
-    def train_q_function(self, env, model, bandit_algorithm):
+    def train_q_function(self, env, model, bandit_algorithm, epochs, train=True, display_state=False):
         """
         Simple temporal difference learning
         with experience-replay
         :return:
         """
         result_file = open(model.base_folder_name + '/result.data', 'w')
-        for episode in xrange(self.epochs):
+        for episode in xrange(epochs):
 
             # Initialize game and parameters for this epoch
             env.reset()
@@ -117,7 +116,7 @@ class RLAgent(object):
 
                 # Check game status and breakout if you have a result
                 if done:
-                    bandit_algorithm.decrement_epsilon(self.epochs)
+                    bandit_algorithm.decrement_epsilon(epochs)
 
                     if batch_mse_stat:
                         avg_batch_mse = sum(batch_mse_stat) * 1.0 / len(batch_mse_stat)
