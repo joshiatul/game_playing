@@ -71,6 +71,7 @@ class RLAgent(object):
         self.train_model_after_samples = train_model_after_samples
         self.experience_replay_obs = ExperienceReplay(type='deque', batchsize=batchsize, experience_replay_size=experience_replay_size,
                                                       minibatch_method=minibatch_method)
+        self.statistics = None
 
     def initialize(self, model_params, bandit_params, test=False):
         """
@@ -92,16 +93,17 @@ class RLAgent(object):
                 model.model = pyvw.vw("--quiet -i {0}".format(model.model_path))
 
         bandit_algorithm = BanditAlgorithm(params=bandit_params)
+        self.statistics = Statistics(base_folder_name=model_params['base_folder_name'])
 
         return model, bandit_algorithm
 
-    def train_q_function(self, env, model, bandit_algorithm, epochs, train=True, display_state=False):
+    def play_with_environment(self, env, model, bandit_algorithm, epochs, train=True, display_state=False):
         """
         Simple temporal difference learning
         with experience-replay
         :return:
         """
-        result_file = open(model.base_folder_name + '/result.data', 'w')
+        #result_file = open(model.base_folder_name + '/result.data', 'w')
         for episode in xrange(epochs):
 
             # Initialize game and parameters for this epoch
@@ -114,20 +116,22 @@ class RLAgent(object):
             # Start playing the game
             for move in xrange(self.max_steps):
 
+                if display_state: env.render()
+
                 # Check game status and breakout if you have a result
                 if done:
                     bandit_algorithm.decrement_epsilon(epochs)
 
-                    if batch_mse_stat:
-                        avg_batch_mse = sum(batch_mse_stat) * 1.0 / len(batch_mse_stat)
-                    else:
-                        avg_batch_mse = 0
-                    res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, move,
-                                                                                                                            total_reward,
-                                                                                                                            avg_batch_mse,
-                                                                                                                            len(batch_mse_stat))
-                    print res_line
-                    result_file.write(res_line)
+                    # if batch_mse_stat:
+                    #     avg_batch_mse = sum(batch_mse_stat) * 1.0 / len(batch_mse_stat)
+                    # else:
+                    #     avg_batch_mse = 0
+                    # res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, move,
+                    #                                                                                                         total_reward,
+                    #                                                                                                         avg_batch_mse,
+                    #                                                                                                         len(batch_mse_stat))
+                    # print res_line
+                    # result_file.write(res_line)
                     break
 
                 # Store current game state
@@ -140,47 +144,52 @@ class RLAgent(object):
                 new_state, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
                 total_reward += cumu_reward
 
-                if old_state and new_state:
-                    self.experience_replay_obs.store_for_experience_replay((old_state, best_known_decision, cumu_reward, new_state, done))
+                if train:
+                    if old_state and new_state:
+                        self.experience_replay_obs.store_for_experience_replay((old_state, best_known_decision, cumu_reward, new_state, done))
 
-                # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
-                if not self.experience_replay_obs.start_training():
-                    continue
+                    # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
+                    if not self.experience_replay_obs.start_training():
+                        continue
 
-                # Start training only after buffer is full
-                else:
+                    # Start training only after buffer is full
+                    else:
 
-                    # randomly sample our experience replay memory
-                    minibatch = self.experience_replay_obs.return_minibatch()
+                        # randomly sample our experience replay memory
+                        minibatch = self.experience_replay_obs.return_minibatch()
 
-                    # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
-                    for memory_lst in minibatch:
-                        old_state_er, action_er, reward_er, new_state_er, done_er = memory_lst
+                        # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
+                        for memory_lst in minibatch:
+                            old_state_er, action_er, reward_er, new_state_er, done_er = memory_lst
 
-                        # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
-                        if not done_er and model.exists:  # non-terminal state
-                            # Get value estimate for that best action and update EXISTING reward
-                            result = bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, model, env.action_space)
-                            max_reward = result[1]
+                            # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
+                            if not done_er and model.exists:  # non-terminal state
+                                # Get value estimate for that best action and update EXISTING reward
+                                result = bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, model, env.action_space)
+                                max_reward = result[1]
 
-                            # Update reward for the current step AND for last n stapes (if n is large, we deploy TD-lambda)
-                            # TODO TD-lambda
-                            if result:
-                                reward_er += self.gamma * max_reward
+                                # Update reward for the current step AND for last n stapes (if n is large, we deploy TD-lambda)
+                                # TODO TD-lambda
+                                if result:
+                                    reward_er += self.gamma * max_reward
 
-                        # Design matrix is based on estimate of reward at state,action step t+1
-                        X_new, y_new = model.return_design_matrix((old_state_er, action_er), reward_er)
-                        model.X.append(X_new)
-                        model.y.append(y_new)
+                            # Design matrix is based on estimate of reward at state,action step t+1
+                            X_new, y_new = model.return_design_matrix((old_state_er, action_er), reward_er)
+                            model.X.append(X_new)
+                            model.y.append(y_new)
 
-                    # We are retraining in every single epoch, but with some subset of all samples
-                    if len(model.X) > self.train_model_after_samples:
-                        batch_mse = model.fit(model.X, model.y)
-                        batch_mse_stat.append(batch_mse)
-                        model.clean_buffer()
+                        # We are retraining in every single epoch, but with some subset of all samples
+                        if len(model.X) > self.train_model_after_samples:
+                            batch_mse = model.fit(model.X, model.y)
+                            batch_mse_stat.append(batch_mse)
+                            model.clean_buffer()
+
+                    # Record statistics
+                    self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, total_reward, batch_mse_stat=batch_mse_stat,
+                                                               train=train, model=model)
 
         model.finish()
-        result_file.close()
+        #result_file.close()
         return bandit_algorithm.policy, model
 
     def test_q_function(self, env, model, bandit_algorithm, test_games, render=False):
@@ -263,3 +272,54 @@ class ExperienceReplay(object):
             return False
         else:
             return True
+
+class Statistics(object):
+    def __init__(self, base_folder_name):
+        self.total_reward = 0
+        self.total_steps = 0
+        self.total_episodes = 0
+        self.result_file = open(base_folder_name + '/result.data', 'w')
+        self.result = {}
+        self.batch_mse_stat = []
+
+    def record_episodic_statistics(self, done, max_steps, episode, total_moves, total_episodic_reward, batch_mse_stat, train=True,
+                                   model=None):
+        """
+        For now record statistics only if episode is ended OR max steps are done
+        """
+        if done or (not done and total_moves == (max_steps - 1)):
+            if batch_mse_stat:
+                avg_batch_mse = sum(batch_mse_stat) * 1.0 / len(batch_mse_stat)
+            else:
+                avg_batch_mse = 0
+
+            res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, total_moves,
+                                                                                                                    total_episodic_reward,
+                                                                                                                    round(avg_batch_mse, 2),
+                                                                                                                   len(batch_mse_stat))
+            if train:
+                print res_line
+                self.result_file.write(res_line)
+
+            self.total_reward = total_episodic_reward
+            self.total_episodes = episode
+
+            model_type = 'random' if not model else model.model_class
+            if model_type not in self.result:
+                self.result[model_type] = Counter()
+
+            if done:
+                if total_episodic_reward > 0:
+                    self.result[model_type]['player wins'] += 1
+                else:
+                    self.result[model_type]['player loses'] += 1
+            else:
+                self.result[model_type]['in process'] += 1
+
+    def calculate_final_statistics(self, model):
+        model_type = 'random' if not model else model.model_class
+        self.result[model_type]['avgerage_reward_per_episode'] = round(self.total_reward * 1.0 / self.total_episodes, 2)
+        self.total_reward = 0
+        self.total_steps = 0
+        self.total_episodes = 0
+        self.result_file.close()

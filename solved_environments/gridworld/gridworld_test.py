@@ -21,7 +21,7 @@ def train_rl_agent(env_name, train=True):
                        gamma=rl_params['gamma'], skip_frames=rl_params['skip_frames'], max_steps=rl_params['max_steps'])
     if train:
         model, bandit_algorithm = rl_agent.initialize(model_params, bandit_params)
-        rl_agent.train_q_function(env, model, bandit_algorithm, epochs=60000, train=True, display_state=False)
+        rl_agent.play_with_environment(env, model, bandit_algorithm, epochs=60000, train=True, display_state=False)
 
     else:
         model, bandit_algorithm = rl_agent.initialize(model_params, bandit_params, test=True)
