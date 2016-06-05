@@ -23,11 +23,10 @@ class BanditAlgorithm(object):
     def return_decision_reward_tuples(self, state, model, all_possible_decisions):
         q_value_table = []
         for decision in all_possible_decisions:
-            if model.exists:
-                decision_state = (state, decision)
-                feature_vector, y = model.return_design_matrix(decision_state)
-                reward = model.predict(feature_vector)
-                q_value_table.append(reward)
+            decision_state = (state, decision)
+            feature_vector, y = model.return_design_matrix(decision_state)
+            reward = model.predict(feature_vector)
+            q_value_table.append(reward)
 
         return q_value_table
 
@@ -40,18 +39,12 @@ class BanditAlgorithm(object):
 
     def return_action_based_on_greedy_policy(self, state, model, all_possible_decisions):
 
-        if model.exists and state:
-            result = ()
-            q_value_table = self.return_decision_reward_tuples(state, model, all_possible_decisions)
-            # Store policy learned so far
-            if q_value_table:
-                max_value, max_index = self.return_decision_with_max_reward(q_value_table)
-                result = (all_possible_decisions[max_index], max_value)
-        else:
-            try:
-                result = (random.choice(all_possible_decisions), 0)
-            except:
-                result = (all_possible_decisions.sample(), 0)
+        result = ()
+        q_value_table = self.return_decision_reward_tuples(state, model, all_possible_decisions)
+        # Store policy learned so far
+        if q_value_table:
+            max_value, max_index = self.return_decision_with_max_reward(q_value_table)
+            result = (all_possible_decisions[max_index], max_value)
 
         return result
 
@@ -60,31 +53,17 @@ class BanditAlgorithm(object):
         rnd = random.random()
         if algorithm == 'random' or not getattr(model, 'exists', None) or (algorithm=='epsilon-greedy' and rnd < self.params and not test) or not state:
             try:
-                best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
+                result = (random.choice(all_possible_decisions), 0)
             except:
-                best_known_decision, max_reward = (all_possible_decisions.sample(), 0)
+                result = (all_possible_decisions.sample(), 0)
 
         elif test or (algorithm == 'epsilon-greedy' and rnd >= self.params and state):
-
             result = self.return_action_based_on_greedy_policy(state, model, all_possible_decisions)
-            if result:
-                best_known_decision, max_reward = result
 
-                # Probably no need to save policy (for environments other than blackjack)
-                # self.policy[state] = [state[0], state[1], best_known_decision, max_reward]
+            # Probably no need to save policy (for environments other than blackjack)
+            # self.policy[state] = [state[0], state[1], best_known_decision, max_reward]
 
-            else:
-                try:
-                    best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
-                except:
-                    best_known_decision, max_reward = (all_possible_decisions.sample(), 0)
-
-            # else:
-            #     try:
-            #         best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
-            #     except:
-            #         best_known_decision, max_reward = (all_possible_decisions.sample(), 0)
-
+        best_known_decision, max_reward = result
         return best_known_decision, max_reward
 
     def decrement_epsilon(self, epochs):

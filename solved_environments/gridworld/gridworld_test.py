@@ -29,5 +29,5 @@ def train_rl_agent(env_name, train=True):
         print stat
 
 
-train_rl_agent(env_name='gridworld', train=True)
+#train_rl_agent(env_name='gridworld', train=True)
 train_rl_agent(env_name='gridworld', train=False)
