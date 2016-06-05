@@ -25,9 +25,8 @@ def train_rl_agent(env_name, train=True):
 
     else:
         model, bandit_algorithm = rl_agent.initialize(model_params, bandit_params, test=True)
-        random_stat, model_stat = rl_agent.test_q_function(env, model, bandit_algorithm, test_games=100, render=False)
-        print random_stat
-        print model_stat
+        stat = rl_agent.test_q_function(env, model, bandit_algorithm, test_games=100, render=False)
+        print stat
 
 
 train_rl_agent(env_name='gridworld', train=True)

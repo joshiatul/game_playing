@@ -55,23 +55,23 @@ class BanditAlgorithm(object):
 
         return result
 
-    def select_decision_given_state(self, state, all_possible_decisions, model=None, algorithm='random'):
+    def select_decision_given_state(self, state, all_possible_decisions, model=None, algorithm='random', test=False):
 
-        if algorithm == 'epsilon-greedy':
-            if random.random() > self.params and state:
+        rnd = random.random()
+        if algorithm == 'random' or not getattr(model, 'exists', None) or (algorithm=='epsilon-greedy' and rnd < self.params and not test) or not state:
+            try:
+                best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
+            except:
+                best_known_decision, max_reward = (all_possible_decisions.sample(), 0)
 
-                result = self.return_action_based_on_greedy_policy(state, model, all_possible_decisions)
-                if result:
-                    best_known_decision, max_reward = result
+        elif test or (algorithm == 'epsilon-greedy' and rnd >= self.params and state):
 
-                    # Probably no need to save policy (for environments other than blackjack)
-                    # self.policy[state] = [state[0], state[1], best_known_decision, max_reward]
+            result = self.return_action_based_on_greedy_policy(state, model, all_possible_decisions)
+            if result:
+                best_known_decision, max_reward = result
 
-                else:
-                    try:
-                        best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
-                    except:
-                        best_known_decision, max_reward = (all_possible_decisions.sample(), 0)
+                # Probably no need to save policy (for environments other than blackjack)
+                # self.policy[state] = [state[0], state[1], best_known_decision, max_reward]
 
             else:
                 try:
@@ -79,7 +79,13 @@ class BanditAlgorithm(object):
                 except:
                     best_known_decision, max_reward = (all_possible_decisions.sample(), 0)
 
-            return best_known_decision, max_reward
+            # else:
+            #     try:
+            #         best_known_decision, max_reward = (random.choice(all_possible_decisions), 0)
+            #     except:
+            #         best_known_decision, max_reward = (all_possible_decisions.sample(), 0)
+
+        return best_known_decision, max_reward
 
     def decrement_epsilon(self, epochs):
         if self.params > 0.1:

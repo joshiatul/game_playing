@@ -103,7 +103,6 @@ class RLAgent(object):
         with experience-replay
         :return:
         """
-        #result_file = open(model.base_folder_name + '/result.data', 'w')
         for episode in xrange(epochs):
 
             # Initialize game and parameters for this epoch
@@ -121,17 +120,6 @@ class RLAgent(object):
                 # Check game status and breakout if you have a result
                 if done:
                     bandit_algorithm.decrement_epsilon(epochs)
-
-                    # if batch_mse_stat:
-                    #     avg_batch_mse = sum(batch_mse_stat) * 1.0 / len(batch_mse_stat)
-                    # else:
-                    #     avg_batch_mse = 0
-                    # res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, move,
-                    #                                                                                                         total_reward,
-                    #                                                                                                         avg_batch_mse,
-                    #                                                                                                         len(batch_mse_stat))
-                    # print res_line
-                    # result_file.write(res_line)
                     break
 
                 # Store current game state
@@ -139,7 +127,7 @@ class RLAgent(object):
 
                 # Figure out best action based on policy
                 best_known_decision, known_reward = bandit_algorithm.select_decision_given_state(env.state, env.action_space, model,
-                                                                                                 algorithm='epsilon-greedy')
+                                                                                                 algorithm='epsilon-greedy', test=not train)
 
                 new_state, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
                 total_reward += cumu_reward
@@ -184,48 +172,50 @@ class RLAgent(object):
                             batch_mse_stat.append(batch_mse)
                             model.clean_buffer()
 
-                    # Record statistics
-                    self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, total_reward, batch_mse_stat=batch_mse_stat,
-                                                               train=train, model=model)
+                # Record statistics
+                self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, batch_mse_stat=batch_mse_stat,
+                                                           train=train, model=model)
 
-        model.finish()
-        #result_file.close()
-        return bandit_algorithm.policy, model
+        if train: model.finish()
+        self.statistics.calculate_final_statistics(model)
+        return self.statistics.result
 
     def test_q_function(self, env, model, bandit_algorithm, test_games, render=False):
         print "---------- Testing policy:-----------"
 
-        random_stat = self.test_q_function_with_model(env, bandit_algorithm, test_games, model='random', render=False)
-        model_stat = self.test_q_function_with_model(env, bandit_algorithm, test_games, model=model, render=render)
+        self.play_with_environment(env, model=None, bandit_algorithm=bandit_algorithm, epochs=test_games, train=False, display_state=False)
+        #random_stat = self.test_q_function_with_model(env, bandit_algorithm, test_games, model='random', render=False)
+        #model_stat = self.test_q_function_with_model(env, bandit_algorithm, test_games, model=model, render=render)
+        self.play_with_environment(env, model, bandit_algorithm, epochs=test_games, train=False, display_state=False)
 
-        return random_stat, model_stat
+        return self.statistics.result
 
-    def test_q_function_with_model(self, env, bandit_algorithm, test_games=1, model='random', render=False):
-        result = Counter()
-        for episode in xrange(test_games):
-            env.reset()
-            done = False
-            per_episode_result = Counter()
-            for mv in xrange(1, self.max_steps):
-                if render: env.render()
-                if model == 'random':
-                    action = random.choice(env.action_space)
-                else:
-                    action, value_estimate = bandit_algorithm.return_action_based_on_greedy_policy(env.state, model, env.action_space)
-                    observation, reward, done, info = env.step(action, self.skip_frames)
-
-                if done:
-                    if reward > 0:
-                        result['player wins'] += 1
-                    else:
-                        result['player loses'] += 1
-                    break
-
-            if not done:
-                result['in process'] += 1
-
-        result['average reward'] = sum(per_episode_result.itervalues()) / test_games
-        return result
+    # def test_q_function_with_model(self, env, bandit_algorithm, test_games=1, model='random', render=False):
+    #     result = Counter()
+    #     for episode in xrange(test_games):
+    #         env.reset()
+    #         done = False
+    #         per_episode_result = Counter()
+    #         for mv in xrange(1, self.max_steps):
+    #             if render: env.render()
+    #             if model == 'random':
+    #                 action = random.choice(env.action_space)
+    #             else:
+    #                 action, value_estimate = bandit_algorithm.return_action_based_on_greedy_policy(env.state, model, env.action_space)
+    #                 observation, reward, done, info = env.step(action, self.skip_frames)
+    #
+    #             if done:
+    #                 if reward > 0:
+    #                     result['player wins'] += 1
+    #                 else:
+    #                     result['player loses'] += 1
+    #                 break
+    #
+    #         if not done:
+    #             result['in process'] += 1
+    #
+    #     result['average reward'] = sum(per_episode_result.itervalues()) / test_games
+    #     return result
 
 
 class ExperienceReplay(object):
