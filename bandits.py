@@ -51,7 +51,8 @@ class BanditAlgorithm(object):
     def select_decision_given_state(self, state, all_possible_decisions, model=None, algorithm='random', test=False):
 
         rnd = random.random()
-        if algorithm == 'random' or not getattr(model, 'exists', None) or (algorithm=='epsilon-greedy' and rnd < self.params and not test) or not state:
+        if algorithm == 'random' or not getattr(model, 'exists', None) or (
+                    algorithm == 'epsilon-greedy' and rnd < self.params and not test) or not state:
             try:
                 result = (random.choice(all_possible_decisions), 0)
             except:

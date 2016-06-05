@@ -107,20 +107,15 @@ class RLAgent(object):
 
             # Initialize game and parameters for this epoch
             env.reset()
-            done = None
             total_reward = 0
-            total_steps = 0
             batch_mse_stat = []
+
+            if train: bandit_algorithm.decrement_epsilon(epochs)
 
             # Start playing the game
             for move in xrange(self.max_steps):
 
                 if display_state: env.render()
-
-                # Check game status and breakout if you have a result
-                if done:
-                    bandit_algorithm.decrement_epsilon(epochs)
-                    break
 
                 # Store current game state
                 old_state = env.state if env.state else None
@@ -133,8 +128,7 @@ class RLAgent(object):
                 total_reward += cumu_reward
 
                 if train:
-                    if old_state and new_state:
-                        self.experience_replay_obs.store_for_experience_replay((old_state, best_known_decision, cumu_reward, new_state, done))
+                    self.experience_replay_obs.store_for_experience_replay((old_state, best_known_decision, cumu_reward, new_state, done))
 
                     # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
                     if not self.experience_replay_obs.start_training():
@@ -142,7 +136,6 @@ class RLAgent(object):
 
                     # Start training only after buffer is full
                     else:
-
                         # randomly sample our experience replay memory
                         minibatch = self.experience_replay_obs.return_minibatch()
 
@@ -176,6 +169,9 @@ class RLAgent(object):
                 self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, batch_mse_stat=batch_mse_stat,
                                                            train=train, model=model)
 
+                # Check game status and break if you have a result
+                if done: break
+
         if train: model.finish()
         self.statistics.calculate_final_statistics(model)
         return self.statistics.result
@@ -184,38 +180,9 @@ class RLAgent(object):
         print "---------- Testing policy:-----------"
 
         self.play_with_environment(env, model=None, bandit_algorithm=bandit_algorithm, epochs=test_games, train=False, display_state=False)
-        #random_stat = self.test_q_function_with_model(env, bandit_algorithm, test_games, model='random', render=False)
-        #model_stat = self.test_q_function_with_model(env, bandit_algorithm, test_games, model=model, render=render)
         self.play_with_environment(env, model, bandit_algorithm, epochs=test_games, train=False, display_state=False)
 
         return self.statistics.result
-
-    # def test_q_function_with_model(self, env, bandit_algorithm, test_games=1, model='random', render=False):
-    #     result = Counter()
-    #     for episode in xrange(test_games):
-    #         env.reset()
-    #         done = False
-    #         per_episode_result = Counter()
-    #         for mv in xrange(1, self.max_steps):
-    #             if render: env.render()
-    #             if model == 'random':
-    #                 action = random.choice(env.action_space)
-    #             else:
-    #                 action, value_estimate = bandit_algorithm.return_action_based_on_greedy_policy(env.state, model, env.action_space)
-    #                 observation, reward, done, info = env.step(action, self.skip_frames)
-    #
-    #             if done:
-    #                 if reward > 0:
-    #                     result['player wins'] += 1
-    #                 else:
-    #                     result['player loses'] += 1
-    #                 break
-    #
-    #         if not done:
-    #             result['in process'] += 1
-    #
-    #     result['average reward'] = sum(per_episode_result.itervalues()) / test_games
-    #     return result
 
 
 class ExperienceReplay(object):
@@ -235,11 +202,13 @@ class ExperienceReplay(object):
             self.experience_replay = {}
 
     def store_for_experience_replay(self, state_tuple):
-        if self.type == 'deque':
-            self.experience_replay.appendleft(state_tuple)
+        old_state, best_known_decision, cumu_reward, new_state, done = state_tuple
+        if old_state and new_state:
+            if self.type == 'deque':
+                self.experience_replay.appendleft(state_tuple)
 
-        elif self.type == 'dict':
-            pass
+            elif self.type == 'dict':
+                pass
 
     def return_minibatch(self):
         if self.minibatch_method == 'random':
@@ -258,10 +227,11 @@ class ExperienceReplay(object):
         """
         Start training only if experience replay memory is full
         """
-        if (len(self.experience_replay) < self.experience_replay_size):
+        if len(self.experience_replay) < self.experience_replay_size:
             return False
         else:
             return True
+
 
 class Statistics(object):
     def __init__(self, base_folder_name):
@@ -286,7 +256,7 @@ class Statistics(object):
             res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, total_moves,
                                                                                                                     total_episodic_reward,
                                                                                                                     round(avg_batch_mse, 2),
-                                                                                                                   len(batch_mse_stat))
+                                                                                                                    len(batch_mse_stat))
             if train:
                 print res_line
                 self.result_file.write(res_line)
@@ -310,6 +280,5 @@ class Statistics(object):
         model_type = 'random' if not model else model.model_class
         self.result[model_type]['avgerage_reward_per_episode'] = round(self.total_reward * 1.0 / self.total_episodes, 2)
         self.total_reward = 0
-        self.total_steps = 0
         self.total_episodes = 0
         self.result_file.close()
