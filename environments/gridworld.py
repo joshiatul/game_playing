@@ -1,6 +1,6 @@
 import random
 from collections import namedtuple
-from . import game
+import game
 import numpy as np
 import pandas as pd
 import math
@@ -69,22 +69,31 @@ class GridWorld(game.AbstractGame):
             random_coors = [self.coordinates(i, j) for i, j in zip(random.sample(xrange(0, 4), 4), [random.randint(0, 3) for _ in xrange(0, 4)])]
             self.player_info, self.wall_info, self.pit_info, self.win_info = random_coors
 
+
         # Else generate only player and win randomly
         else:
-            x1, y1 = 1, 3
+            x1, y1 = 2, 1
             self.wall_info = self.coordinates(x1, y1)
-            x2, y2 = 2, 3
+            x2, y2 = 1, 0
             self.pit_info = self.coordinates(x2, y2)
-
-            x3, y3 = (random.randint(0, 3), random.randint(0, 3))
-            while (x1, y1) == (x3, y3):
-                x3, y3 = (random.randint(0, 3), random.randint(0, 3))
-            self.player_info = self.coordinates(x3, y3)
-
-            x4, y4 = (random.randint(0, 3), random.randint(0, 3))
-            while (x2, y2) == (x4, y4):
-                x4, y4 = (random.randint(0, 3), random.randint(0, 3))
-            self.win_info = self.coordinates(x4, y4)
+            x1, y1 = 3, 0
+            self.player_info = self.coordinates(x1, y1)
+            x2, y2 = 0, 1
+            self.win_info = self.coordinates(x2, y2)
+            # x1, y1 = 1, 3
+            # self.wall_info = self.coordinates(x1, y1)
+            # x2, y2 = 2, 3
+            # self.pit_info = self.coordinates(x2, y2)
+            #
+            # x3, y3 = (random.randint(0, 3), random.randint(0, 3))
+            # while (x1, y1) == (x3, y3):
+            #     x3, y3 = (random.randint(0, 3), random.randint(0, 3))
+            # self.player_info = self.coordinates(x3, y3)
+            #
+            # x4, y4 = (random.randint(0, 3), random.randint(0, 3))
+            # while (x2, y2) == (x4, y4):
+            #     x4, y4 = (random.randint(0, 3), random.randint(0, 3))
+            # self.win_info = self.coordinates(x4, y4)
 
         game_state = (self.player_info, self.wall_info, self.pit_info, self.win_info)
         game_state = tuple(('feature' + str(idx) + '-' + '-'.join(str(x) for x in obs) for idx, obs in enumerate(game_state)))
@@ -156,7 +165,7 @@ class GridWorld(game.AbstractGame):
         else:
             # Return distance from win (player looks at screen so i think this is fair)
             return -(math.sqrt((self.player_info.x - self.win_info.x) ** 2 + (self.player_info.y - self.win_info.y) ** 2))
-            # return -1
+            #return 0
 
 
 if __name__ == "__main__":
@@ -164,17 +173,17 @@ if __name__ == "__main__":
     gridworld.reset()
     print gridworld.player_info
     gridworld.render()
-    reward = gridworld.step('down')
-    print gridworld.player_info
-    gridworld.render()
-    reward = gridworld.step('down')
-    print gridworld.player_info
-    print gridworld.render()
-    reward = gridworld.step('down')
-    print gridworld.player_info
-    print gridworld.render()
-    reward = gridworld.step('right')
-    print gridworld.player_info
-    print gridworld.render()
-
-    print reward
+    # reward = gridworld.step('down')
+    # print gridworld.player_info
+    # gridworld.render()
+    # reward = gridworld.step('down')
+    # print gridworld.player_info
+    # print gridworld.render()
+    # reward = gridworld.step('down')
+    # print gridworld.player_info
+    # print gridworld.render()
+    # reward = gridworld.step('right')
+    # print gridworld.player_info
+    # print gridworld.render()
+    #
+    # print reward
