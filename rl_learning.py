@@ -83,15 +83,11 @@ class RLAgent(object):
         """
         if not test:
             model = Model(model_params)
-            model.initialize()
 
         else:
-            # TODO Instantiate a model based on train or test (Move the following in Model)
             model = pickle.load(open(model_params['base_folder_name'] + '/model_obs.pkl', mode='rb'))
-            if model.model_class == 'vw_python':
-                from vowpal_wabbit import pyvw
-                model.model = pyvw.vw("--quiet -i {0}".format(model.model_path))
 
+        model.initialize(test)
         bandit_algorithm = BanditAlgorithm(params=bandit_params)
         self.statistics = Statistics(base_folder_name=model_params['base_folder_name'])
 

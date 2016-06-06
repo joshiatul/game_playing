@@ -17,9 +17,8 @@ import mmh3
 """
 All models get implemented here
 1) simple lookup
-2) scikit-learn SGD regressor(doesn't learn)
-4) vw-python wrapper - works wonderfully well
-5) For adding new model update design matrix, fit, predict methods
+2) vw-python wrapper - works wonderfully well
+.. For adding new model update design matrix, fit, predict methods
 """
 
 
@@ -50,21 +49,18 @@ class Model(object):
             with open(self.base_folder_name + '/model_obs.pkl', mode='wb') as model_file:
                 pickle.dump(self, model_file)
 
-    def initialize(self):
-        if self.model_class == 'scikit':
-            self.model = SGDRegressor(loss='squared_loss', alpha=0.1, n_iter=10, shuffle=True, eta0=0.0001)
-            self.feature_constructor = FeatureHasher(n_features=200, dtype=np.float64, non_negative=False, input_type='dict')
-
-        elif self.model_class == 'lookup':
+    def initialize(self, test):
+        if self.model_class == 'lookup':
             self.model = {}
 
         elif self.model_class == 'vw_python':
             self.model_path = self.base_folder_name + "/model.vw"
             self.cache_path = self.base_folder_name + "/temp.cache"
-            self.filename = self.base_folder_name + "/train.vw"
-            #self.f1 = open(self.filename, 'w')
-            self.model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True, cache=self.cache_path,
-                                 f=self.model_path,  b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'])
+            if not test:
+                self.model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True, cache=self.cache_path,
+                                     f=self.model_path,  b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'])
+            else:
+                self.model = pyvw.vw("--quiet -i {0}".format(self.model_path))
 
     def remove_vw_files(self):
         if os.path.isfile(self.cache_path): os.remove(self.cache_path)
@@ -76,7 +72,6 @@ class Model(object):
         self.y = []
         self.buffer = 0
 
-    #@do_profile
     def return_design_matrix(self, decision_state, reward=None, weight=1):
         """
         Design matrix can simply return catesian product of state and decision
@@ -108,12 +103,7 @@ class Model(object):
                 tag = str(mmh3.hash128(tag))
                 all_features_with_interaction = all_features + [tag]
 
-                if self.model_class == 'scikit':
-                    tr = {fea_value: 1 for fea_value in all_features_with_interaction}
-                    fv = self.feature_constructor.transform([tr]).toarray()
-                    fv = fv[0]
-
-                elif self.model_class == 'vw' or self.model_class == 'vw_python':
+                if self.model_class == 'vw' or self.model_class == 'vw_python':
                     input = " ".join(all_features_with_interaction)
                     if reward:
                         if reward > 0: weight = 5
@@ -134,13 +124,7 @@ class Model(object):
             return fv, reward
 
     def fit(self, X, y):
-        if self.model_class == 'scikit':
-            # X, y = self.shuffle_data(X, y)
-            self.model.partial_fit(X, y)
-            print self.model.score(X, y)
-            self.exists = True
-
-        elif self.model_class == 'lookup_table':
+        if self.model_class == 'lookup_table':
             for decision_state in X:
                 if decision_state not in self.model:
                     for d in self.all_possible_decisions:
@@ -165,11 +149,7 @@ class Model(object):
             return batch_mse
 
     def predict(self, test):
-        if self.model_class == 'scikit':
-            test = test.reshape(1, -1)  # Reshape for single sample
-            return self.model.predict(test)[0]
-
-        elif self.model_class == 'lookup_table':
+        if self.model_class == 'lookup_table':
             if test not in self.model:
                 for d in self.all_possible_decisions:
                     self.model[(test[0], d)] = bandit.DecisionState()
@@ -180,8 +160,3 @@ class Model(object):
             res = test.get_simplelabel_prediction()
             return res
 
-    @staticmethod
-    def shuffle_data(a, b):
-        assert len(a) == len(b)
-        p = np.random.permutation(len(a))
-        return a[p], b[p]
