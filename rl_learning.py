@@ -72,6 +72,8 @@ class RLAgent(object):
         self.experience_replay_obs = ExperienceReplay(type='deque', batchsize=batchsize, experience_replay_size=experience_replay_size,
                                                       minibatch_method=minibatch_method)
         self.statistics = None
+        self.model = None
+        self.bandit_algorithm = None
 
     def initialize(self, model_params, bandit_params, test=False):
         """
@@ -89,11 +91,14 @@ class RLAgent(object):
 
         model.initialize(test)
         bandit_algorithm = BanditAlgorithm(params=bandit_params)
+
+        self.model = model
+        self.bandit_algorithm = bandit_algorithm
         self.statistics = Statistics(base_folder_name=model_params['base_folder_name'])
 
         return model, bandit_algorithm
 
-    def play_with_environment(self, env, model, bandit_algorithm, epochs, train=True, display_state=False):
+    def play_with_environment(self, env, epochs, train=True, display_state=False):
         """
         Simple temporal difference learning
         with experience-replay
@@ -106,7 +111,7 @@ class RLAgent(object):
             total_reward = 0
             batch_mse_stat = []
 
-            if train: bandit_algorithm.decrement_epsilon(epochs)
+            if train: self.bandit_algorithm.decrement_epsilon(epochs)
 
             # Start playing the game
             for move in xrange(self.max_steps):
@@ -117,7 +122,7 @@ class RLAgent(object):
                 old_state = env.state if env.state else None
 
                 # Figure out best action based on policy
-                best_known_decision, known_reward = bandit_algorithm.select_decision_given_state(env.state, env.action_space, model,
+                best_known_decision, known_reward = self.bandit_algorithm.select_decision_given_state(env.state, env.action_space, self.model,
                                                                                                  algorithm='epsilon-greedy', test=not train)
 
                 new_state, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
@@ -140,9 +145,9 @@ class RLAgent(object):
                             old_state_er, action_er, reward_er, new_state_er, done_er = memory_lst
 
                             # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
-                            if not done_er and model.exists:  # non-terminal state
+                            if not done_er and self.model.exists:  # non-terminal state
                                 # Get value estimate for that best action and update EXISTING reward
-                                result = bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, model, env.action_space)
+                                result = self.bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, self.model, env.action_space)
                                 max_reward = result[1]
 
                                 # Update reward for the current step AND for last n stapes (if n is large, we deploy TD-lambda)
@@ -151,32 +156,35 @@ class RLAgent(object):
                                     reward_er += self.gamma * max_reward
 
                             # Design matrix is based on estimate of reward at state,action step t+1
-                            X_new, y_new = model.return_design_matrix((old_state_er, action_er), reward_er)
-                            model.X.append(X_new)
-                            model.y.append(y_new)
+                            X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er)
+                            self.model.X.append(X_new)
+                            self.model.y.append(y_new)
 
                         # We are retraining in every single epoch, but with some subset of all samples
-                        if len(model.X) > self.train_model_after_samples:
-                            batch_mse = model.fit(model.X, model.y)
+                        if len(self.model.X) > self.train_model_after_samples:
+                            batch_mse = self.model.fit(self.model.X, self.model.y)
                             batch_mse_stat.append(batch_mse)
-                            model.clean_buffer()
+                            self.model.clean_buffer()
 
                 # Record statistics
                 self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, batch_mse_stat=batch_mse_stat,
-                                                           train=train, model=model)
+                                                           train=train, model=self.model)
 
                 # Check game status and break if you have a result
                 if done: break
 
-        if train: model.finish()
-        self.statistics.calculate_final_statistics(model)
+        if train: self.model.finish()
+        self.statistics.calculate_final_statistics(self.model)
         return self.statistics.result
 
-    def test_q_function(self, env, model, bandit_algorithm, test_games, render=False):
+    def test_q_function(self, env, test_games, render=False):
         print "---------- Testing policy:-----------"
 
-        self.play_with_environment(env, model=None, bandit_algorithm=bandit_algorithm, epochs=test_games, train=False, display_state=False)
-        self.play_with_environment(env, model, bandit_algorithm, epochs=test_games, train=False, display_state=False)
+        # First test with trained model
+        self.play_with_environment(env, epochs=test_games, train=False, display_state=False)
+        # Now with random
+        self.model = None
+        self.play_with_environment(env, epochs=test_games, train=False, display_state=False)
 
         return self.statistics.result
 
