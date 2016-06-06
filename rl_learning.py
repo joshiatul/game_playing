@@ -74,6 +74,7 @@ class RLAgent(object):
         self.statistics = None
         self.model = None
         self.bandit_algorithm = None
+        self.batch_mse_stat = []
 
     def initialize(self, model_params, bandit_params, test=False):
         """
@@ -96,7 +97,7 @@ class RLAgent(object):
         self.bandit_algorithm = bandit_algorithm
         self.statistics = Statistics(base_folder_name=model_params['base_folder_name'])
 
-        return model, bandit_algorithm
+        return
 
     def play_with_environment(self, env, epochs, train=True, display_state=False):
         """
@@ -104,12 +105,13 @@ class RLAgent(object):
         with experience-replay
         :return:
         """
+        start_time = time.time()
         for episode in xrange(epochs):
 
             # Initialize game and parameters for this epoch
             env.reset()
             total_reward = 0
-            batch_mse_stat = []
+            self.batch_mse_stat = []
 
             if train: self.bandit_algorithm.decrement_epsilon(epochs)
 
@@ -129,60 +131,66 @@ class RLAgent(object):
                 total_reward += cumu_reward
 
                 if train:
-                    self.experience_replay_obs.store_for_experience_replay((old_state, best_known_decision, cumu_reward, new_state, done))
-
-                    # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
-                    if not self.experience_replay_obs.start_training():
-                        continue
-
-                    # Start training only after buffer is full
-                    else:
-                        # randomly sample our experience replay memory
-                        minibatch = self.experience_replay_obs.return_minibatch()
-
-                        # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
-                        for memory_lst in minibatch:
-                            old_state_er, action_er, reward_er, new_state_er, done_er = memory_lst
-
-                            # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
-                            if not done_er and self.model.exists:  # non-terminal state
-                                # Get value estimate for that best action and update EXISTING reward
-                                result = self.bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, self.model, env.action_space)
-                                max_reward = result[1]
-
-                                # Update reward for the current step AND for last n stapes (if n is large, we deploy TD-lambda)
-                                # TODO TD-lambda
-                                if result:
-                                    reward_er += self.gamma * max_reward
-
-                            # Design matrix is based on estimate of reward at state,action step t+1
-                            X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er)
-                            self.model.X.append(X_new)
-                            self.model.y.append(y_new)
-
-                        # We are retraining in every single epoch, but with some subset of all samples
-                        if len(self.model.X) > self.train_model_after_samples:
-                            batch_mse = self.model.fit(self.model.X, self.model.y)
-                            batch_mse_stat.append(batch_mse)
-                            self.model.clean_buffer()
+                    self.train_q_function_with_experience_replay(env, state_tuple=(old_state, best_known_decision, cumu_reward, new_state, done))
 
                 # Record statistics
-                self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, batch_mse_stat=batch_mse_stat,
+                self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, batch_mse_stat=self.batch_mse_stat,
                                                            train=train, model=self.model)
 
                 # Check game status and break if you have a result
                 if done: break
 
         if train: self.model.finish()
-        self.statistics.calculate_final_statistics(self.model)
+        self.statistics.calculate_summary_statistics(self.model)
+        print "elapsed time:" + str(int(time.time() - start_time))
         return self.statistics.result
+
+    def train_q_function_with_experience_replay(self, env, state_tuple):
+        self.experience_replay_obs.store_for_experience_replay(state_tuple)
+
+        # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
+        if not self.experience_replay_obs.start_training():
+            return
+
+        # Start training only after buffer is full
+        else:
+            # randomly sample our experience replay memory
+            minibatch = self.experience_replay_obs.return_minibatch()
+
+            # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
+            for memory_lst in minibatch:
+                old_state_er, action_er, reward_er, new_state_er, done_er = memory_lst
+
+                # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
+                if not done_er and self.model.exists:  # non-terminal state
+                    # Get value estimate for that best action and update EXISTING reward
+                    result = self.bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, self.model, env.action_space)
+                    max_reward = result[1]
+
+                    # Update reward for the current step AND for last n stapes (if n is large, we deploy TD-lambda)
+                    # TODO TD-lambda
+                    if result:
+                        reward_er += self.gamma * max_reward
+
+                # Design matrix is based on estimate of reward at state,action step t+1
+                X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er)
+                self.model.X.append(X_new)
+                self.model.y.append(y_new)
+
+            # We are retraining in every single epoch, but with some subset of all samples
+            if len(self.model.X) > self.train_model_after_samples:
+                batch_mse = self.model.fit(self.model.X, self.model.y)
+                self.batch_mse_stat.append(batch_mse)
+                self.model.clean_buffer()
+
+            return
 
     def test_q_function(self, env, test_games, render=False):
         print "---------- Testing policy:-----------"
 
         # First test with trained model
-        self.play_with_environment(env, epochs=test_games, train=False, display_state=False)
-        # Now with random
+        self.play_with_environment(env, epochs=test_games, train=False, display_state=render)
+        # Now with random model
         self.model = None
         self.play_with_environment(env, epochs=test_games, train=False, display_state=False)
 
@@ -280,7 +288,7 @@ class Statistics(object):
             else:
                 self.result[model_type]['in process'] += 1
 
-    def calculate_final_statistics(self, model):
+    def calculate_summary_statistics(self, model):
         model_type = 'random' if not model else model.model_class
         self.result[model_type]['avgerage_reward_per_episode'] = round(self.total_reward * 1.0 / self.total_episodes, 2)
         self.total_reward = 0

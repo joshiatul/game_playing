@@ -20,11 +20,11 @@ def train_rl_agent(env_name, train=True):
     rl_agent = RLAgent(experience_replay_size=rl_params['experience_replay_size'], batchsize=rl_params['batchsize'],
                        gamma=rl_params['gamma'], skip_frames=rl_params['skip_frames'], max_steps=rl_params['max_steps'])
     if train:
-        model, bandit_algorithm = rl_agent.initialize(model_params, bandit_params)
+        rl_agent.initialize(model_params, bandit_params)
         rl_agent.play_with_environment(env, epochs=60000, train=True, display_state=False)
 
     else:
-        model, bandit_algorithm = rl_agent.initialize(model_params, bandit_params, test=True)
+        rl_agent.initialize(model_params, bandit_params, test=True)
         stat = rl_agent.test_q_function(env, test_games=100, render=False)
         print stat
 
