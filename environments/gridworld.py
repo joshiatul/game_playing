@@ -160,12 +160,12 @@ class GridWorld(game.AbstractGame):
         elif self.player_info == self.win_info:
             self.game_status = 'player wins'
             return 20
-        elif self.player_info == self.player_old_state:
-            return -10
+        # elif self.player_info == self.player_old_state:
+        #     return -10
         else:
             # Return distance from win (player looks at screen so i think this is fair)
-            return -(math.sqrt((self.player_info.x - self.win_info.x) ** 2 + (self.player_info.y - self.win_info.y) ** 2))
-            #return 0
+            #return -(math.sqrt((self.player_info.x - self.win_info.x) ** 2 + (self.player_info.y - self.win_info.y) ** 2))
+            return -1
 
 
 if __name__ == "__main__":

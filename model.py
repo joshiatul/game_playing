@@ -81,10 +81,10 @@ class Model(object):
             return decision_state, reward
 
         else:
-            train_test_mode = 'train' if reward else 'test'
+            train_test_mode = 'mode'
             cache_key = str(mmh3.hash128(repr((decision_state, train_test_mode))))
             if cache_key in self.design_matrix_cache:
-                fv, reward = self.design_matrix_cache[cache_key]
+                input_str = self.design_matrix_cache[cache_key]
 
             else:
                 state, decision_taken = decision_state
@@ -103,23 +103,28 @@ class Model(object):
                 tag = str(mmh3.hash128(tag))
                 all_features_with_interaction = all_features + [tag]
 
-                if self.model_class == 'vw' or self.model_class == 'vw_python':
+                if self.model_class == 'vw_python':
                     input = " ".join(all_features_with_interaction)
-                    if reward:
-                        if reward > 0: weight = 5
-                        output = str(reward) + " " + str(weight)
-                        fv = output + " |sd " + input + '\n'
-                    else:
-                        fv = " |sd " + input + '\n'
+                    input_str = " |sd " + input + '\n'
 
-                    if self.model_class == 'vw_python':
-                        fv = self.model.example(fv)
+                    # Store in cache
+                    self.design_matrix_cache[cache_key] = input_str
 
-                # Store only training examples
-                # TODO: pyvw for blackjack is somehow still screwed up for cache
-                # TODO Something is messed here NEED TO FIX HOw COME ONLY blackjack fails?
-                if 'hit' not in self.all_possible_decisions:
-                    self.design_matrix_cache[cache_key] = (fv, reward)
+            # Do this after cache retrieval
+            if reward:
+                output = str(reward) + " " + str(weight)
+                fv = output + input_str
+            else:
+                fv = input_str
+
+            if self.model_class == 'vw_python':
+                fv = self.model.example(fv)
+                #
+                # # Store only training examples
+                # # TODO: pyvw for blackjack is somehow still screwed up for cache
+                # # TODO Something is messed here NEED TO FIX HOw COME ONLY blackjack fails?
+                # if 'hit' not in self.all_possible_decisions:
+                #     self.design_matrix_cache[cache_key] = (fv, reward)
 
             return fv, reward
 
