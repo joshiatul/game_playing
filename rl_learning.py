@@ -8,8 +8,7 @@ import numpy as np
 from collections import OrderedDict
 
 
-# TODO Reward clipping (clip reward between [-1,1]
-# TODO Experience replay with dict
+# TODO BUG in caching design matrix (reward keeps changing but not cached)
 # TODO batch_mse is zero?
 # TODO Test arbitary weighnig scheme
 
@@ -135,7 +134,9 @@ class RLAgent(object):
                 total_reward += cumu_reward
 
                 if train:
-                    self.train_q_function_with_experience_replay(env, episode_key=(episode, move), state_tuple=(old_state, best_known_decision, cumu_reward, new_state, done))
+                    # if abs(cumu_reward) == 20:
+                    #     self.experience_replay_obs.update_experience_replay_memory_for_td_lambda(episode, move, self.gamma, cumu_reward)
+                    self.train_q_function_with_experience_replay(env, episode_key=(episode, move), state_tuple=(old_state, best_known_decision, cumu_reward, new_state, done, 1))
 
                 # Record statistics
                 self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, batch_mse_stat=self.batch_mse_stat,
@@ -163,7 +164,7 @@ class RLAgent(object):
 
             # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
             for memory_lst in minibatch:
-                old_state_er, action_er, reward_er, new_state_er, done_er = memory_lst
+                old_state_er, action_er, reward_er, new_state_er, done_er, weight_er = memory_lst
 
                 # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
                 if not done_er and self.model.exists:  # non-terminal state
@@ -178,7 +179,7 @@ class RLAgent(object):
 
                 # Design matrix is based on estimate of reward at state,action step t+1
                 # TODO Use absolute reward as weight may be (or may be some arbitrary scaling of it)
-                X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er)
+                X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er, weight_er)
                 self.model.X.append(X_new)
                 self.model.y.append(y_new)
 
@@ -220,7 +221,7 @@ class ExperienceReplay(object):
             self.experience_replay = OrderedDict()
 
     def store_for_experience_replay(self, state_tuple, episode_move_key=None):
-        old_state, best_known_decision, cumu_reward, new_state, done = state_tuple
+        old_state, best_known_decision, cumu_reward, new_state, done, weight = state_tuple
         if old_state and new_state:
             if self.type == 'deque':
                 self.experience_replay.appendleft(state_tuple)
@@ -257,14 +258,11 @@ class ExperienceReplay(object):
         else:
             return True
 
-    def update_experience_replay_memory_for_td_lambda(self, episode, step, gamma):
+    def update_experience_replay_memory_for_td_lambda(self, episode, step, gamma, final_reward):
         """
         If episodic memory is updated
         also update experience replay memory with the updated rewards
         """
-        # TODO Go back only n steps may be?
-        _, _, final_reward, _, _ = self.experience_replay[(episode, step)]
-
         for backstep in reversed(xrange(step)):
             # TODO Implement frequency based trace as well, for now doing only recency based trail
             key1 = (episode, backstep)
@@ -273,6 +271,7 @@ class ExperienceReplay(object):
                 reward_erl = reward_erl + gamma * final_reward
                 self.experience_replay[(episode, backstep)] = (old_state_erl, action_erl, reward_erl, new_state_erl, is_terminal)
                 final_reward = reward_erl
+
 
 class Statistics(object):
     def __init__(self, base_folder_name):
