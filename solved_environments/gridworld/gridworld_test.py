@@ -10,8 +10,8 @@ def train_rl_agent(env_name, train=True):
         from environments.gridworld import GridWorld
         env = GridWorld()
 
-    rl_params = {'experience_replay_size': 200, 'batchsize': 20, 'gamma': 0.1, 'skip_frames': 1, 'max_steps': 30,
-                 'minibatch_method': 'random', 'train_model_after_samples': 100}
+    rl_params = {'experience_replay_size': 200, 'batchsize': 20, 'gamma': 0.2, 'skip_frames': 1, 'max_steps': 30,
+                 'minibatch_method': 'random', 'train_model_after_samples': 1}
     model_params = {'class': 'vw_python', 'base_folder_name': env.base_folder_name, 'loss_function': 'squared',
                     'l2': 0.0000000001, 'lrq': 'sdsd300', 'b': 20, 'l': 0.5}
     bandit_params = 0.9
@@ -29,5 +29,5 @@ def train_rl_agent(env_name, train=True):
         print stat
 
 
-train_rl_agent(env_name='gridworld', train=True)
+#train_rl_agent(env_name='gridworld', train=True)
 train_rl_agent(env_name='gridworld', train=False)

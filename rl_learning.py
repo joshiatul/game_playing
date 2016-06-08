@@ -5,9 +5,13 @@ import time
 import cPickle as pickle
 from collections import Counter, deque
 import numpy as np
+from collections import OrderedDict
 
 
 # TODO Reward clipping (clip reward between [-1,1]
+# TODO Experience replay with dict
+# TODO batch_mse is zero?
+# TODO Test arbitary weighnig scheme
 
 
 def learn_Q_function(all_observed_decision_states, reward, model):
@@ -69,7 +73,7 @@ class RLAgent(object):
         self.skip_frames = skip_frames
         self.frames = deque(maxlen=skip_frames)
         self.train_model_after_samples = train_model_after_samples
-        self.experience_replay_obs = ExperienceReplay(type='deque', batchsize=batchsize, experience_replay_size=experience_replay_size,
+        self.experience_replay_obs = ExperienceReplay(type='dict', batchsize=batchsize, experience_replay_size=experience_replay_size,
                                                       minibatch_method=minibatch_method)
         self.statistics = None
         self.model = None
@@ -131,7 +135,7 @@ class RLAgent(object):
                 total_reward += cumu_reward
 
                 if train:
-                    self.train_q_function_with_experience_replay(env, state_tuple=(old_state, best_known_decision, cumu_reward, new_state, done))
+                    self.train_q_function_with_experience_replay(env, episode_key=(episode, move), state_tuple=(old_state, best_known_decision, cumu_reward, new_state, done))
 
                 # Record statistics
                 self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, batch_mse_stat=self.batch_mse_stat,
@@ -145,8 +149,8 @@ class RLAgent(object):
         print "elapsed time:" + str(int(time.time() - start_time))
         return self.statistics.result
 
-    def train_q_function_with_experience_replay(self, env, state_tuple):
-        self.experience_replay_obs.store_for_experience_replay(state_tuple)
+    def train_q_function_with_experience_replay(self, env, episode_key, state_tuple):
+        self.experience_replay_obs.store_for_experience_replay(state_tuple, episode_key)
 
         # TODO Why can't we keep on allocating observed rewards to previous steps (using TD-lambda rule except the last step of estimation)
         if not self.experience_replay_obs.start_training():
@@ -173,6 +177,7 @@ class RLAgent(object):
                         reward_er += self.gamma * max_reward
 
                 # Design matrix is based on estimate of reward at state,action step t+1
+                # TODO Use absolute reward as weight may be (or may be some arbitrary scaling of it)
                 X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er)
                 self.model.X.append(X_new)
                 self.model.y.append(y_new)
@@ -211,20 +216,28 @@ class ExperienceReplay(object):
             self.experience_replay = deque(maxlen=self.experience_replay_size)
 
         elif self.type == 'dict':
-            self.experience_replay = {}
+            # {(episode, move): state_action_reward_tuple}
+            self.experience_replay = OrderedDict()
 
-    def store_for_experience_replay(self, state_tuple):
+    def store_for_experience_replay(self, state_tuple, episode_move_key=None):
         old_state, best_known_decision, cumu_reward, new_state, done = state_tuple
         if old_state and new_state:
             if self.type == 'deque':
                 self.experience_replay.appendleft(state_tuple)
 
-            elif self.type == 'dict':
-                pass
+            elif self.type == 'dict' and episode_move_key:
+                if len(self.experience_replay) == self.experience_replay_size:
+                    _ = self.experience_replay.popitem(last=False)
+                self.experience_replay[episode_move_key] = state_tuple
 
     def return_minibatch(self):
         if self.minibatch_method == 'random':
-            minibatch = random.sample(self.experience_replay, self.batchsize)
+            if self.type == 'deque':
+                minibatch = random.sample(self.experience_replay, self.batchsize)
+
+            elif self.type == 'dict':
+                random_keys = random.sample(self.experience_replay.keys(), self.batchsize)
+                minibatch = [self.experience_replay[k] for k in random_keys]
 
         elif self.minibatch_method == 'prioritized':
             # Simple prioritization based on magnitude of reward
@@ -244,6 +257,22 @@ class ExperienceReplay(object):
         else:
             return True
 
+    def update_experience_replay_memory_for_td_lambda(self, episode, step, gamma):
+        """
+        If episodic memory is updated
+        also update experience replay memory with the updated rewards
+        """
+        # TODO Go back only n steps may be?
+        _, _, final_reward, _, _ = self.experience_replay[(episode, step)]
+
+        for backstep in reversed(xrange(step)):
+            # TODO Implement frequency based trace as well, for now doing only recency based trail
+            key1 = (episode, backstep)
+            if key1 in self.experience_replay:
+                old_state_erl, action_erl, reward_erl, new_state_erl, is_terminal = self.experience_replay[key1]
+                reward_erl = reward_erl + gamma * final_reward
+                self.experience_replay[(episode, backstep)] = (old_state_erl, action_erl, reward_erl, new_state_erl, is_terminal)
+                final_reward = reward_erl
 
 class Statistics(object):
     def __init__(self, base_folder_name):
