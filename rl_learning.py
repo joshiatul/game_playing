@@ -134,9 +134,8 @@ class RLAgent(object):
                 total_reward += cumu_reward
 
                 if train:
-                    # if abs(cumu_reward) == 20:
-                    #     self.experience_replay_obs.update_experience_replay_memory_for_td_lambda(episode, move, self.gamma, cumu_reward)
-                    self.train_q_function_with_experience_replay(env, episode_key=(episode, move), state_tuple=(old_state, best_known_decision, cumu_reward, new_state, done, 1))
+                    self.train_q_function_with_experience_replay(env, episode_key=(episode, move), state_tuple=(old_state, best_known_decision,
+                                                                                                                cumu_reward, new_state, done, episode, move))
 
                 # Record statistics
                 self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, batch_mse_stat=self.batch_mse_stat,
@@ -164,21 +163,18 @@ class RLAgent(object):
 
             # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
             for memory_lst in minibatch:
-                old_state_er, action_er, reward_er, new_state_er, done_er, weight_er = memory_lst
+                old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er = memory_lst
 
                 # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
                 if not done_er and self.model.exists:  # non-terminal state
                     # Get value estimate for that best action and update EXISTING reward
                     result = self.bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, self.model, env.action_space)
                     max_reward = result[1]
-
-                    # Update reward for the current step AND for last n stapes (if n is large, we deploy TD-lambda)
-                    # TODO TD-lambda
-                    if result:
-                        reward_er += self.gamma * max_reward
+                    reward_er += self.gamma * max_reward
 
                 # Design matrix is based on estimate of reward at state,action step t+1
                 # TODO Use absolute reward as weight may be (or may be some arbitrary scaling of it)
+                weight_er = 1
                 X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er, weight_er)
                 self.model.X.append(X_new)
                 self.model.y.append(y_new)
@@ -202,6 +198,38 @@ class RLAgent(object):
 
         return self.statistics.result
 
+    # TODO Not using so far / td lambda implementation
+    def generate_design_matrix_with_td_lambda(self, memory_lst, env, lamb):
+        old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er = memory_lst
+        # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
+        if not done_er and self.model.exists:  # non-terminal state
+            # Get value estimate for that best action and update EXISTING reward
+            result = self.bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, self.model, env.action_space)
+            max_reward = result[1]
+            reward_er += self.gamma * max_reward
+
+        # Design matrix is based on estimate of reward at state,action step t+1
+        # TODO Use absolute reward as weight may be (or may be some arbitrary scaling of it)
+        weight_er = 1 - lamb
+        X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er, weight_er)
+        self.model.X.append(X_new)
+        self.model.y.append(y_new)
+
+        # Do eligibility traces only if reward is substantial
+        if reward_er >= abs(-2):
+            for backstep in reversed(xrange(move_er)):
+                # TODO Implement frequency based trace, for now doing only recency based trail
+                key1 = (episode_er, backstep)
+                if key1 in self.experience_replay_obs:
+                    old_state_erl, action_erl, reward_erl, new_state_erl, is_terminal, episode_erl, move_erl = self.experience_replay_obs[key1]
+                    reward_erl = reward_erl + 0.1 * reward_er
+                    reward_er = reward_erl
+                    weight_er = (1 - 0.1) * (0.1 ** move_er - backstep)
+
+                    X_new, y_new = self.model.return_design_matrix((old_state_erl, action_erl), reward_erl, weight_er)
+                    self.model.X.append(X_new)
+                    self.model.y.append(y_new)
+
 
 class ExperienceReplay(object):
     def __init__(self, type, batchsize, experience_replay_size, minibatch_method='random'):
@@ -221,7 +249,7 @@ class ExperienceReplay(object):
             self.experience_replay = OrderedDict()
 
     def store_for_experience_replay(self, state_tuple, episode_move_key=None):
-        old_state, best_known_decision, cumu_reward, new_state, done, weight = state_tuple
+        old_state, best_known_decision, cumu_reward, new_state, done, episode, move = state_tuple
         if old_state and new_state:
             if self.type == 'deque':
                 self.experience_replay.appendleft(state_tuple)
@@ -257,20 +285,6 @@ class ExperienceReplay(object):
             return False
         else:
             return True
-
-    def update_experience_replay_memory_for_td_lambda(self, episode, step, gamma, final_reward):
-        """
-        If episodic memory is updated
-        also update experience replay memory with the updated rewards
-        """
-        for backstep in reversed(xrange(step)):
-            # TODO Implement frequency based trace as well, for now doing only recency based trail
-            key1 = (episode, backstep)
-            if key1 in self.experience_replay:
-                old_state_erl, action_erl, reward_erl, new_state_erl, is_terminal = self.experience_replay[key1]
-                reward_erl = reward_erl + gamma * final_reward
-                self.experience_replay[(episode, backstep)] = (old_state_erl, action_erl, reward_erl, new_state_erl, is_terminal)
-                final_reward = reward_erl
 
 
 class Statistics(object):
