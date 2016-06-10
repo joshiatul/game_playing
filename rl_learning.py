@@ -72,7 +72,7 @@ class RLAgent(object):
         self.skip_frames = skip_frames
         self.frames = deque(maxlen=skip_frames)
         self.train_model_after_samples = train_model_after_samples
-        self.experience_replay_obs = ExperienceReplay(type='dict', batchsize=batchsize, experience_replay_size=experience_replay_size,
+        self.experience_replay_obs = ExperienceReplay(type='deque', batchsize=batchsize, experience_replay_size=experience_replay_size,
                                                       minibatch_method=minibatch_method)
         self.statistics = None
         self.model = None
