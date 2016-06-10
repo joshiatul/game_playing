@@ -138,7 +138,7 @@ class RLAgent(object):
                                                                                                                 cumu_reward, new_state, done, episode, move))
 
                 # Record statistics
-                self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, batch_mse_stat=self.batch_mse_stat,
+                self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, total_reward, batch_mse_stat=self.batch_mse_stat,
                                                            train=train, model=self.model)
 
                 # Check game status and break if you have a result
@@ -198,7 +198,7 @@ class RLAgent(object):
 
         return self.statistics.result
 
-    # TODO Not using so far / td lambda implementation
+    # TODO Not using so far / td lambda implementation for now
     def generate_design_matrix_with_td_lambda(self, memory_lst, env, lamb):
         old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er = memory_lst
         # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
@@ -216,15 +216,16 @@ class RLAgent(object):
         self.model.y.append(y_new)
 
         # Do eligibility traces only if reward is substantial
-        if reward_er >= abs(-2):
+        if reward_er >= abs(-2) and lamb > 0:
             for backstep in reversed(xrange(move_er)):
+                weight_er = (1 - lamb) * (lamb ** (move_er - backstep))
+                if weight_er < 0.001: break # Break if weight is too low
                 # TODO Implement frequency based trace, for now doing only recency based trail
                 key1 = (episode_er, backstep)
-                if key1 in self.experience_replay_obs:
-                    old_state_erl, action_erl, reward_erl, new_state_erl, is_terminal, episode_erl, move_erl = self.experience_replay_obs[key1]
-                    reward_erl = reward_erl + 0.1 * reward_er
+                if key1 in self.experience_replay_obs.experience_replay:
+                    old_state_erl, action_erl, reward_erl, new_state_erl, is_terminal, episode_erl, move_erl = self.experience_replay_obs.experience_replay[key1]
+                    reward_erl += self.gamma * reward_er
                     reward_er = reward_erl
-                    weight_er = (1 - 0.1) * (0.1 ** move_er - backstep)
 
                     X_new, y_new = self.model.return_design_matrix((old_state_erl, action_erl), reward_erl, weight_er)
                     self.model.X.append(X_new)
@@ -296,7 +297,7 @@ class Statistics(object):
         self.result = {}
         self.batch_mse_stat = []
 
-    def record_episodic_statistics(self, done, max_steps, episode, total_moves, total_episodic_reward, batch_mse_stat, train=True,
+    def record_episodic_statistics(self, done, max_steps, episode, total_moves, step_reward, total_episodic_reward, batch_mse_stat, train=True,
                                    model=None):
         """
         For now record statistics only if episode is ended OR max steps are done
