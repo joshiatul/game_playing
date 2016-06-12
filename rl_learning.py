@@ -194,8 +194,11 @@ class RLAgent(object):
         print "---------- Testing policy:-----------"
 
         # First test with trained model
+        print "---------- Testing trained VW model -------"
         self.play_with_environment(env, epochs=test_games, train=False, display_state=render)
         # Now with random model
+
+        print "---------- Testing Random model -----------"
         self.model = None
         self.play_with_environment(env, epochs=test_games, train=False, display_state=False)
 
