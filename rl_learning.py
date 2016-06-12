@@ -8,8 +8,6 @@ import numpy as np
 from collections import OrderedDict
 
 
-# TODO BUG in caching design matrix (reward keeps changing but not cached)
-# TODO batch_mse is zero?
 # TODO Test arbitary weighnig scheme
 
 
@@ -111,6 +109,8 @@ class RLAgent(object):
         start_time = time.time()
         for episode in xrange(epochs):
 
+            if not train: print "Game #-----: " + str(episode)
+
             # Initialize game and parameters for this epoch
             env.reset()
             total_reward = 0
@@ -142,7 +142,10 @@ class RLAgent(object):
                                                            train=train, model=self.model)
 
                 # Check game status and break if you have a result
-                if done: break
+                if done:
+                    if not train and cumu_reward > 0: print 'Player WINS!'
+                    if not train and cumu_reward < 0: print 'Player LOSES!'
+                    break
 
         if train: self.model.finish()
         self.statistics.calculate_summary_statistics(self.model)

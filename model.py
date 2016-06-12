@@ -81,10 +81,13 @@ class Model(object):
             return decision_state, reward
 
         else:
-            train_test_mode = 'mode'
-            cache_key = str(mmh3.hash128(repr((decision_state, train_test_mode))))
+            cache_key = str(mmh3.hash128(repr(decision_state)))
             if cache_key in self.design_matrix_cache:
-                input_str = self.design_matrix_cache[cache_key]
+                fv = self.design_matrix_cache[cache_key]
+                if reward:
+                    fv.set_label_string(str(reward) + " " + str(weight))
+                else:
+                    fv.set_label_string('')
 
             else:
                 state, decision_taken = decision_state
@@ -103,28 +106,20 @@ class Model(object):
                 tag = str(mmh3.hash128(tag))
                 all_features_with_interaction = all_features + [tag]
 
-                if self.model_class == 'vw_python':
-                    input = " ".join(all_features_with_interaction)
-                    input_str = " |sd " + input + '\n'
+                input = " ".join(all_features_with_interaction)
+                input_str = " |sd " + input + '\n'
 
-                    # Store in cache
-                    self.design_matrix_cache[cache_key] = input_str
+                # Do this after cache retrieval
+                if reward:
+                    output = str(reward) + " " + str(weight)
+                    fv = output + input_str
+                else:
+                    fv = input_str
 
-            # Do this after cache retrieval
-            if reward:
-                output = str(reward) + " " + str(weight)
-                fv = output + input_str
-            else:
-                fv = input_str
-
-            if self.model_class == 'vw_python':
                 fv = self.model.example(fv)
-                #
-                # # Store only training examples
-                # # TODO: pyvw for blackjack is somehow still screwed up for cache
-                # # TODO Something is messed here NEED TO FIX HOw COME ONLY blackjack fails?
-                # if 'hit' not in self.all_possible_decisions:
-                #     self.design_matrix_cache[cache_key] = (fv, reward)
+
+                # Store in cache
+                self.design_matrix_cache[cache_key] = fv
 
             return fv, reward
 
