@@ -96,7 +96,7 @@ class RLAgent(object):
 
         self.model = model
         self.bandit_algorithm = bandit_algorithm
-        self.statistics = Statistics(base_folder_name=model_params['base_folder_name'])
+        self.statistics = Statistics(base_folder_name=model_params['base_folder_name'], test=test)
 
         return
 
@@ -295,15 +295,15 @@ class ExperienceReplay(object):
 
 
 class Statistics(object):
-    def __init__(self, base_folder_name):
+    def __init__(self, base_folder_name, test):
         self.total_reward = 0
         self.total_steps = 0
         self.total_episodes = 0
-        self.result_file = open(base_folder_name + '/result.data', 'w')
+        self.result_file = open(base_folder_name + '/result.data', 'w') if not test else None
         self.result = {}
         self.batch_mse_stat = []
 
-    def record_episodic_statistics(self, done, max_steps, episode, total_moves, step_reward, total_episodic_reward, batch_mse_stat, train=True,
+    def record_episodic_statistics(self, done, max_steps, episode, total_moves, step_reward, total_episodic_reward, batch_mse_stat, epsilon, train=True,
                                    model=None):
         """
         For now record statistics only if episode is ended OR max steps are done
@@ -314,13 +314,14 @@ class Statistics(object):
             else:
                 avg_batch_mse = 0
 
-            res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}'.format(episode, total_moves,
+            res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}; epsilon:{5}'.format(episode, total_moves,
                                                                                                                     total_episodic_reward,
-                                                                                                                    round(avg_batch_mse, 2),
-                                                                                                                    len(batch_mse_stat))
+                                                                                                                    round(avg_batch_mse, 6),
+                                                                                                                    len(batch_mse_stat),
+                                                                                                                    round(epsilon, 4))
             if train:
                 print res_line
-                self.result_file.write(res_line)
+                self.result_file.write(res_line+"\n")
 
             self.total_reward = total_episodic_reward
             self.total_episodes = episode
@@ -342,4 +343,7 @@ class Statistics(object):
         self.result[model_type]['avgerage_reward_per_episode'] = round(self.total_reward * 1.0 / self.total_episodes, 2)
         self.total_reward = 0
         self.total_episodes = 0
-        self.result_file.close()
+        try:
+            self.result_file.close()
+        except:
+            pass
