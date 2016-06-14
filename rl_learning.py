@@ -170,8 +170,8 @@ class RLAgent(object):
             minibatch = self.experience_replay_obs.return_minibatch()
 
             # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
-            for memory_lst in minibatch:
-                old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er = memory_lst
+            for index in minibatch:
+                old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er = self.experience_replay_obs.experience_replay[index]
 
                 # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
                 if not done_er and self.model.exists:  # non-terminal state
@@ -236,6 +236,7 @@ class ExperienceReplay(object):
         self.experience_replay = None
         self.batchsize = batchsize
         self.initialize()
+        self.all_indices = range(experience_replay_size)
 
     def initialize(self):
         if self.type == 'deque':
@@ -259,7 +260,8 @@ class ExperienceReplay(object):
     def return_minibatch(self):
         if self.minibatch_method == 'random':
             if self.type == 'deque':
-                minibatch = random.sample(self.experience_replay, self.batchsize)
+                #minibatch = random.sample(self.experience_replay, self.batchsize)
+                minibatch_indices = random.sample(self.all_indices, self.batchsize)
 
             elif self.type == 'dict':
                 random_keys = random.sample(self.experience_replay.keys(), self.batchsize)
@@ -272,7 +274,7 @@ class ExperienceReplay(object):
             selection = set(np.random.choice(range(self.experience_replay_size), self.batchsize, probs))
             minibatch = [j for i, j in enumerate(self.experience_replay) if i in selection]
 
-        return minibatch
+        return minibatch_indices
 
     def start_training(self):
         """
