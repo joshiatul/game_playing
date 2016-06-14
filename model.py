@@ -86,8 +86,8 @@ class Model(object):
                 fv = self.design_matrix_cache[cache_key]
                 if reward:
                     fv.set_label_string(str(reward) + " " + str(weight))
-                else:
-                    fv.set_label_string('')
+                # else:
+                #     fv.set_label_string('')
 
             else:
                 state, decision_taken = decision_state
@@ -142,7 +142,7 @@ class Model(object):
             # Let's use vw as good'old sgd solver
             for _ in xrange(20):
                 # May be shuffling not necessary here
-                random.shuffle(X)
+                # random.shuffle(X)
                 res = [fv.learn() for fv in X]
             self.exists = True
             batch_mse = sum(fv.get_loss()**2 for fv in X) / (len(X)*1.0)

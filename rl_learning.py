@@ -109,11 +109,11 @@ class RLAgent(object):
         start_time = time.time()
         for episode in xrange(epochs):
 
-            if not train: print "Game #-----: " + str(episode)
+            if not train and display_state: print "Game #-----: " + str(episode)
 
             # Initialize game and parameters for this epoch
             observation = env.reset()
-            old_state = env.preprocess(observation)
+            current_state = env.preprocess(observation)
             new_state = None
             total_reward = 0
             self.batch_mse_stat = []
@@ -126,11 +126,10 @@ class RLAgent(object):
                 if display_state: env.render()
 
                 # Store current game state
-                #old_state = env.state if env.state else None
-                old_state = new_state if new_state else None
+                #current_state = env.state if env.state else None
 
                 # Figure out best action based on policy
-                best_known_decision, known_reward = self.bandit_algorithm.select_decision_given_state(old_state, env.action_space, self.model,
+                best_known_decision, known_reward = self.bandit_algorithm.select_decision_given_state(current_state, env.action_space, self.model,
                                                                                                  algorithm='epsilon-greedy', test=not train)
 
                 observation, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
@@ -138,7 +137,7 @@ class RLAgent(object):
                 total_reward += cumu_reward
 
                 if train:
-                    self.train_q_function_with_experience_replay(env, episode_key=(episode, move), state_tuple=(old_state, best_known_decision,
+                    self.train_q_function_with_experience_replay(env, episode_key=(episode, move), state_tuple=(current_state, best_known_decision,
                                                                                                                 cumu_reward, new_state, done, episode, move))
 
                 # Record statistics
@@ -147,9 +146,11 @@ class RLAgent(object):
 
                 # Check game status and break if you have a result
                 if done:
-                    if not train and cumu_reward > 0: print 'Player WINS!'
-                    if not train and cumu_reward < 0: print 'Player LOSES!'
+                    if not train and display_state and cumu_reward > 0: print 'Player WINS!'
+                    if not train and display_state and cumu_reward < 0: print 'Player LOSES!'
                     break
+
+                current_state = new_state
 
         if train: self.model.finish()
         self.statistics.calculate_summary_statistics(self.model)
