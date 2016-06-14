@@ -112,7 +112,9 @@ class RLAgent(object):
             if not train: print "Game #-----: " + str(episode)
 
             # Initialize game and parameters for this epoch
-            env.reset()
+            observation = env.reset()
+            old_state = env.preprocess(observation)
+            new_state = None
             total_reward = 0
             self.batch_mse_stat = []
 
@@ -124,13 +126,15 @@ class RLAgent(object):
                 if display_state: env.render()
 
                 # Store current game state
-                old_state = env.state if env.state else None
+                #old_state = env.state if env.state else None
+                old_state = new_state if new_state else None
 
                 # Figure out best action based on policy
-                best_known_decision, known_reward = self.bandit_algorithm.select_decision_given_state(env.state, env.action_space, self.model,
+                best_known_decision, known_reward = self.bandit_algorithm.select_decision_given_state(old_state, env.action_space, self.model,
                                                                                                  algorithm='epsilon-greedy', test=not train)
 
-                new_state, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
+                observation, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
+                new_state = env.preprocess(observation)
                 total_reward += cumu_reward
 
                 if train:
@@ -139,7 +143,7 @@ class RLAgent(object):
 
                 # Record statistics
                 self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, total_reward, batch_mse_stat=self.batch_mse_stat,
-                                                           train=train, model=self.model)
+                                                           epsilon=self.bandit_algorithm.params, train=train, model=self.model)
 
                 # Check game status and break if you have a result
                 if done:

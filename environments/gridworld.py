@@ -101,6 +101,7 @@ class GridWorld(game.AbstractGame):
         self.game_status = 'in process'
         # Certain actions are not possible if the player is sitting on the edge
         self.evaluate_and_modify_possible_actions()
+        return game_state
 
     def render(self):
         grid = np.zeros((4, 4), dtype='<U2')
@@ -167,6 +168,9 @@ class GridWorld(game.AbstractGame):
             #return -(math.sqrt((self.player_info.x - self.win_info.x) ** 2 + (self.player_info.y - self.win_info.y) ** 2))
             return -1
 
+    def preprocess(self, observation):
+        # No preprocessing for gridworld
+        return observation
 
 if __name__ == "__main__":
     gridworld = GridWorld()

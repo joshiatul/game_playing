@@ -10,6 +10,7 @@ class AbstractGame(object):
     def __init__(self, name):
         self.base_folder_name = os.path.dirname(os.path.realpath(__file__)).replace('environments', 'solved_environments') + '/' + name
         # state should be a vector (1d array)
+        self.old_preprocessed_screen = None
 
     @abstractmethod
     def reset(self):
@@ -68,3 +69,27 @@ class AbstractGame(object):
         :return:
         """
         return misc.imresize(original_image, size)
+
+    def preprocess(self, observation):
+        # crop
+        observation = observation[35:195]
+        # grayscale
+        grayscale_obs = observation.mean(axis=2)
+        # resize
+        resized_grayscale_obs = misc.imresize(grayscale_obs, (40, 40))
+        # new-old
+        if len(self.old_preprocessed_screen) > 0:
+            screen_delta = resized_grayscale_obs - self.old_preprocessed_screen
+            # Store as old screen
+            self.old_preprocessed_screen = resized_grayscale_obs
+            # flatten
+            screen_delta = screen_delta.flatten()
+            # return non-zero pixels as preprocessed screen
+            return screen_delta
+
+        else:
+            # Store as old screen
+            self.old_preprocessed_screen = resized_grayscale_obs
+            return
+
+
