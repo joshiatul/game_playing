@@ -209,23 +209,8 @@ class RLAgent(object):
 
         return self.statistics.result
 
-    # TODO Not using so far / td lambda implementation for now
-    def generate_design_matrix_with_td_lambda(self, memory_lst, env, lamb):
-        old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er = memory_lst
-        # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
-        if not done_er and self.model.exists:  # non-terminal state
-            # Get value estimate for that best action and update EXISTING reward
-            result = self.bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, self.model, env.action_space)
-            max_reward = result[1]
-            reward_er += self.gamma * max_reward
-
-        # Design matrix is based on estimate of reward at state,action step t+1
-        # TODO Use absolute reward as weight may be (or may be some arbitrary scaling of it)
-        weight_er = 1 - lamb
-        X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er, weight_er)
-        self.model.X.append(X_new)
-        self.model.y.append(y_new)
-
+    # TODO Not using td lambda implementation for now (i assume if i do this, i can get away with less epochs)
+    def append_design_matrix_with_td_lambda(self, episode_er, move_er, reward_er, lamb):
         # Do eligibility traces only if reward is substantial
         if reward_er >= abs(-2) and lamb > 0:
             for backstep in reversed(xrange(move_er)):

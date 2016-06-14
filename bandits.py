@@ -5,7 +5,6 @@ All exploration algorithms live here
 We will start with Epsilon-greedy but plan to add softmax and others
 """
 
-
 class DecisionState(object):
     def __init__(self):
         self.count = 0
@@ -19,15 +18,20 @@ class BanditAlgorithm(object):
         self.policy = {}
         self.decisions = None
 
+    def _return_reward_given_decision_state(self, decision_state, model):
+        feature_vector, y = model.return_design_matrix(decision_state)
+        reward = model.predict(feature_vector)
+        return reward
+
     # TODO This may belong outside bandit
     def return_decision_reward_tuples(self, state, model, all_possible_decisions):
-        q_value_table = []
-        for decision in all_possible_decisions:
-            decision_state = (state, decision)
-            feature_vector, y = model.return_design_matrix(decision_state)
-            reward = model.predict(feature_vector)
-            q_value_table.append(reward)
-
+        # q_value_table = []
+        # for decision in all_possible_decisions:
+        #     decision_state = (state, decision)
+        #     feature_vector, y = model.return_design_matrix(decision_state)
+        #     reward = model.predict(feature_vector)
+        #     q_value_table.append(reward)
+        q_value_table = tuple(self._return_reward_given_decision_state((state, decision), model) for decision in all_possible_decisions)
         return q_value_table
 
     # TODO This may belong outside bandit

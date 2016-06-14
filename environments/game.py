@@ -85,7 +85,7 @@ class AbstractGame(object):
             # flatten
             screen_delta = screen_delta.flatten()
             # return non-zero pixels as preprocessed screen
-            return screen_delta
+            return np.nonzero(screen_delta)[0]
 
         else:
             # Store as old screen

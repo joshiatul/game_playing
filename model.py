@@ -21,7 +21,6 @@ All models get implemented here
 .. For adding new model update design matrix, fit, predict methods
 """
 
-
 class Model(object):
     def __init__(self, params):
         self.model_class = params['class']
@@ -81,17 +80,19 @@ class Model(object):
             return decision_state, reward
 
         else:
-            cache_key = str(mmh3.hash128(repr(decision_state)))
+            # cache_key = str(mmh3.hash128(repr(decision_state)))
+            cache_key = repr(decision_state)
             if cache_key in self.design_matrix_cache:
-                fv = self.design_matrix_cache[cache_key]
+                input_str = self.design_matrix_cache[cache_key]
                 if reward:
-                    fv.set_label_string(str(reward) + " " + str(weight))
-                # else:
-                #     fv.set_label_string('')
+                    #fv.set_label_string(str(reward) + " " + str(weight))
+                    fv = str(reward) + " " + str(weight) + input_str
+                else:
+                    fv = input_str
 
             else:
                 state, decision_taken = decision_state
-                # Right now features are simply state X decision interaction + single interaction feature representing state
+                # Right now features are simply state X decision interaction + single interaction feature representing state and action
                 try:
                     # Features are simply pixel-action interactions
                     all_features = [obs + '-' + str(decision_taken) for obs in state]
@@ -116,10 +117,10 @@ class Model(object):
                 else:
                     fv = input_str
 
-                fv = self.model.example(fv)
+                #fv = self.model.example(fv)
 
                 # Store in cache
-                self.design_matrix_cache[cache_key] = fv
+                self.design_matrix_cache[cache_key] = input_str
 
             return fv, reward
 
@@ -143,9 +144,12 @@ class Model(object):
             for _ in xrange(20):
                 # May be shuffling not necessary here
                 # random.shuffle(X)
-                res = [fv.learn() for fv in X]
+                # res = [fv.learn() for fv in X]
+                # No need to invoke vw example object, just use lower level learn function
+                res = [self.model.learn(fv) for fv in X]
             self.exists = True
-            batch_mse = sum(fv.get_loss()**2 for fv in X) / (len(X)*1.0)
+            batch_mse = 0
+            # TODO Record loss sum(fv.get_loss()**2 for fv in X) / (len(X)*1.0)
             return batch_mse
 
     def predict(self, test):
@@ -156,7 +160,8 @@ class Model(object):
             return self.model[test].value_estimate
 
         elif self.model_class == 'vw_python':
-            test.learn()  # Little wierd that we have to call learn at all for a prediction
-            res = test.get_simplelabel_prediction()
+            # test.learn()  # Little wierd that we have to call learn at all for a prediction
+            # res = test.get_simplelabel_prediction()
+            res = self.model.predict(test)
             return res
 
