@@ -114,7 +114,6 @@ class RLAgent(object):
             # Initialize game and parameters for this epoch
             observation = env.reset()
             current_state = env.preprocess(observation)
-            new_state = None
             total_reward = 0
             self.batch_mse_stat = []
 
@@ -125,9 +124,6 @@ class RLAgent(object):
 
                 if display_state: env.render()
 
-                # Store current game state
-                #current_state = env.state if env.state else None
-
                 # Figure out best action based on policy
                 best_known_decision, known_reward = self.bandit_algorithm.select_decision_given_state(current_state, env.action_space, self.model,
                                                                                                  algorithm='epsilon-greedy', test=not train)
@@ -135,10 +131,11 @@ class RLAgent(object):
                 observation, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
                 new_state = env.preprocess(observation)
                 total_reward += cumu_reward
+                td_error = cumu_reward - known_reward
 
                 if train:
                     self.train_q_function_with_experience_replay(env, episode_key=(episode, move), state_tuple=(current_state, best_known_decision,
-                                                                                                                cumu_reward, new_state, done, episode, move))
+                                                                                                                cumu_reward, new_state, done, episode, move, td_error))
 
                 # Record statistics
                 self.statistics.record_episodic_statistics(done, self.max_steps, episode, move, cumu_reward, total_reward, batch_mse_stat=self.batch_mse_stat,
@@ -171,19 +168,26 @@ class RLAgent(object):
 
             # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
             for index in minibatch:
-                old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er = self.experience_replay_obs.experience_replay[index]
+                old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er, td_error_er = self.experience_replay_obs.experience_replay[index]
 
                 # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
                 if not done_er and self.model.exists:  # non-terminal state
                     # Get value estimate for that best action and update EXISTING reward
                     result = self.bandit_algorithm.return_action_based_on_greedy_policy(new_state_er, self.model, env.action_space)
                     max_reward = result[1]
-                    reward_er += self.gamma * max_reward
+                    old_estimate = reward_er - td_error_er
+                    reward_er_n = reward_er + self.gamma * max_reward
+                    td_error_er = reward_er_n - old_estimate
 
+                else:
+                    reward_er_n = reward_er
+
+                self.experience_replay_obs.experience_replay[index] = (
+                old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er, abs(td_error_er))
                 # Design matrix is based on estimate of reward at state,action step t+1
                 # TODO Use absolute reward as weight may be (or may be some arbitrary scaling of it)
                 weight_er = 1
-                X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er, weight_er)
+                X_new, y_new = self.model.return_design_matrix((old_state_er, action_er), reward_er_n, weight_er)
                 self.model.X.append(X_new)
                 self.model.y.append(y_new)
 
@@ -247,7 +251,7 @@ class ExperienceReplay(object):
             self.experience_replay = OrderedDict()
 
     def store_for_experience_replay(self, state_tuple, episode_move_key=None):
-        old_state, best_known_decision, cumu_reward, new_state, done, episode, move = state_tuple
+        old_state, best_known_decision, cumu_reward, new_state, done, episode, move, td_error = state_tuple
         if old_state and new_state:
             if self.type == 'deque':
                 self.experience_replay.appendleft(state_tuple)
@@ -269,10 +273,9 @@ class ExperienceReplay(object):
 
         elif self.minibatch_method == 'prioritized':
             # Simple prioritization based on magnitude of reward
-            total_reward_in_ex_replay = sum(max(abs(st[2]), (1.0 / self.experience_replay_size)) for st in self.experience_replay)
-            probs = tuple((max(abs(st[2]), (1.0 / self.experience_replay_size)) * 1.0 / total_reward_in_ex_replay for st in self.experience_replay))
-            selection = set(np.random.choice(range(self.experience_replay_size), self.batchsize, probs))
-            minibatch = [j for i, j in enumerate(self.experience_replay) if i in selection]
+            total_reward_in_ex_replay = sum(max(abs(st[7]), (1.0 / self.experience_replay_size)) for st in self.experience_replay)
+            probs = tuple((max(abs(st[7]), (1.0 / self.experience_replay_size)) * 1.0 / total_reward_in_ex_replay for st in self.experience_replay))
+            minibatch_indices = set(np.random.choice(self.all_indices, self.batchsize, probs))
 
         return minibatch_indices
 
