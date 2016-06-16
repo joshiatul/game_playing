@@ -309,9 +309,9 @@ class Statistics(object):
             else:
                 avg_batch_mse = 0
 
-            res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; avg_batch_mse:{3}; batches_trained:{4}; epsilon:{5}'.format(episode, total_moves,
+            res_line = 'Game:{0}; total_steps:{1}; total_reward:{2}; final_reward:{3}; batches_trained:{4}; epsilon:{5}'.format(episode, total_moves,
                                                                                                                     total_episodic_reward,
-                                                                                                                    round(avg_batch_mse, 6),
+                                                                                                                    round(step_reward, 4),
                                                                                                                     len(batch_mse_stat),
                                                                                                                     round(epsilon, 4))
             if train:

@@ -3,14 +3,12 @@ import os
 from scipy import misc
 import numpy as np
 
-
 class AbstractGame(object):
     __metaclass__ = ABCMeta
 
     def __init__(self, name):
         self.base_folder_name = os.path.dirname(os.path.realpath(__file__)).replace('environments', 'solved_environments') + '/' + name
-        # state should be a vector (1d array)
-        self.old_preprocessed_screen = None
+        self.old_preprocessed_screen = []
 
     @abstractmethod
     def reset(self):
@@ -76,7 +74,7 @@ class AbstractGame(object):
         # grayscale
         grayscale_obs = observation.mean(axis=2)
         # resize
-        resized_grayscale_obs = misc.imresize(grayscale_obs, (40, 40))
+        resized_grayscale_obs = misc.imresize(grayscale_obs, (80, 80))
         # new-old
         if len(self.old_preprocessed_screen) > 0:
             screen_delta = resized_grayscale_obs - self.old_preprocessed_screen
@@ -85,7 +83,9 @@ class AbstractGame(object):
             # flatten
             screen_delta = screen_delta.flatten()
             # return non-zero pixels as preprocessed screen
-            return np.nonzero(screen_delta)[0]
+            screen_delta = np.nonzero(screen_delta)[0]
+            screen_delta = [str(i) for i in screen_delta]
+            return screen_delta
 
         else:
             # Store as old screen

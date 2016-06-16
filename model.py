@@ -56,8 +56,8 @@ class Model(object):
             self.model_path = self.base_folder_name + "/model.vw"
             self.cache_path = self.base_folder_name + "/temp.cache"
             if not test:
-                self.model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True, cache=self.cache_path,
-                                     f=self.model_path,  b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'])
+                self.model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True,
+                                     f=self.model_path,  b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'], k=True)
             else:
                 self.model = pyvw.vw("--quiet -i {0}".format(self.model_path))
 
