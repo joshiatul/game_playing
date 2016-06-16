@@ -241,6 +241,9 @@ class ExperienceReplay(object):
         self.batchsize = batchsize
         self.initialize()
         self.all_indices = range(experience_replay_size)
+        # For stratified sampling
+        self.positive_batchsize = int(self.batchsize * 0.05)
+        self.negative_batchsize = self.batchsize - self.positive_batchsize
 
     def initialize(self):
         if self.type == 'deque':
@@ -264,18 +267,40 @@ class ExperienceReplay(object):
     def return_minibatch(self):
         if self.minibatch_method == 'random':
             if self.type == 'deque':
-                #minibatch = random.sample(self.experience_replay, self.batchsize)
                 minibatch_indices = random.sample(self.all_indices, self.batchsize)
 
             elif self.type == 'dict':
-                random_keys = random.sample(self.experience_replay.keys(), self.batchsize)
-                minibatch = [self.experience_replay[k] for k in random_keys]
+                minibatch_indices = random.sample(self.experience_replay.keys(), self.batchsize)
 
+        # Only work with deque type
         elif self.minibatch_method == 'prioritized':
             # Simple prioritization based on magnitude of reward
             total_reward_in_ex_replay = sum(max(abs(st[7]), (1.0 / self.experience_replay_size)) for st in self.experience_replay)
             probs = tuple((max(abs(st[7]), (1.0 / self.experience_replay_size)) * 1.0 / total_reward_in_ex_replay for st in self.experience_replay))
-            minibatch_indices = set(np.random.choice(self.all_indices, self.batchsize, probs))
+            minibatch_indices = list(np.random.choice(self.all_indices, self.batchsize, probs))
+
+            # Add small % of positive examples to balance things out?
+            # positive_reward_indices = tuple((idx for idx, st in enumerate(self.experience_replay) if st[2] > 0))
+            # if len(positive_reward_indices) > 0:
+            #     if len(positive_reward_indices) >= self.positive_batchsize:
+            #         positive_minibatch_indices = random.sample(positive_reward_indices, self.positive_batchsize)
+            #     else:
+            #         positive_minibatch_indices = list(positive_reward_indices)
+            #     minibatch_indices += positive_minibatch_indices
+
+        # Only work with deque type
+        elif self.minibatch_method == 'stratified':
+            positive_reward_indices = tuple((idx for idx, st in enumerate(self.experience_replay) if st[2] > 0))
+            negative_minibatch_indices = random.sample(self.all_indices, self.negative_batchsize)
+            if len(positive_reward_indices) > 0:
+                if len(positive_reward_indices) >= self.positive_batchsize:
+                    positive_minibatch_indices = random.sample(positive_reward_indices, self.positive_batchsize)
+                else:
+                    positive_minibatch_indices = list(positive_reward_indices)
+                minibatch_indices = negative_minibatch_indices + positive_minibatch_indices
+
+            else:
+                minibatch_indices = negative_minibatch_indices
 
         return minibatch_indices
 

@@ -141,7 +141,7 @@ class Model(object):
 
         elif self.model_class == 'vw_python':
             # Let's use vw as good'old sgd solver
-            for _ in xrange(20):
+            for _ in xrange(1):
                 # May be shuffling not necessary here
                 # random.shuffle(X)
                 # res = [fv.learn() for fv in X]
