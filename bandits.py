@@ -1,76 +1,75 @@
 import random
+import numpy as np
+import math
 
 """
 All exploration algorithms live here
 We will start with Epsilon-greedy but plan to add softmax and others
 """
 
+
+# ---------------- Helper functions for Epsilon-greedy ------------------------- #
+def _return_reward_given_decision_state(decision_state, model, critic_model=False):
+    feature_vector, y = model.return_design_matrix(decision_state, critic_model=critic_model)
+    reward = model.predict(feature_vector, critic_model=critic_model)
+    return reward
+
+
+def return_action_based_on_greedy_policy(state, model, all_possible_decisions):
+    result = ()
+    q_value_table = tuple(_return_reward_given_decision_state((state, decision), model) for decision in all_possible_decisions)
+    # Store policy learned so far
+    if q_value_table:
+        max_value = max(q_value_table)
+        max_index = q_value_table.index(max_value)
+        result = (all_possible_decisions[max_index], max_value)
+    return result
+
+
+def return_action_based_on_softmax_policy(state, model, all_possible_decisions):
+    if not model or not model.if_exists():
+        action = np.random.choice(all_possible_decisions)
+        q_val = 0
+    else:
+        temperature = 1.0
+        q_value_table = tuple(_return_reward_given_decision_state((state, decision), model, critic_model=True) for decision in all_possible_decisions)
+        q_value_table_exp = tuple(math.exp(q_val / temperature) for q_val in q_value_table)
+        total = sum(q_value_table_exp)
+        q_value_table_prop = [q_value / total for q_value in q_value_table_exp]
+        action = np.random.choice(all_possible_decisions, p=q_value_table_prop)
+        q_val = q_value_table[all_possible_decisions.index(action)]
+
+    return action, q_val
+
+
+def select_action_with_epsilon_greedy_policy(state, all_possible_decisions, model=None, epsilon=0, test=False):
+    rnd = random.random()
+    if not model or not model.if_exists() or (
+                rnd < epsilon and not test) or len(state) == 0:
+        try:
+            result = (random.choice(all_possible_decisions), 0)
+        except:
+            result = (all_possible_decisions.sample(), 0)
+
+    elif test or (rnd >= epsilon and len(state) > 0):
+        result = return_action_based_on_greedy_policy(state, model, all_possible_decisions)
+
+    best_known_decision, max_reward = result
+    return best_known_decision, max_reward
+
+
+def decrement_epsilon(epochs, epsilon, anneal_epsilon_timesteps, end_epsilon):
+    if epsilon > end_epsilon:
+        epsilon -= ((1.0-end_epsilon) / anneal_epsilon_timesteps)
+    return epsilon
+
+
+def sample_end_epsilon():
+    return np.random.choice([0.1, 0.01, 0.5], p=[0.45, 0.45, 0.1])
+
+
+# ---- Methods For lookup table -----
 class DecisionState(object):
     def __init__(self):
         self.count = 0
         self.value_estimate = 0
-
-
-class BanditAlgorithm(object):
-    def __init__(self, params=0):
-        self.decision_states = {}
-        self.params = params
-        self.policy = {}
-        self.decisions = None
-
-    def _return_reward_given_decision_state(self, decision_state, model):
-        feature_vector, y = model.return_design_matrix(decision_state)
-        reward = model.predict(feature_vector)
-        return reward
-
-    # TODO This may belong outside bandit
-    def return_decision_reward_tuples(self, state, model, all_possible_decisions):
-        # q_value_table = []
-        # for decision in all_possible_decisions:
-        #     decision_state = (state, decision)
-        #     feature_vector, y = model.return_design_matrix(decision_state)
-        #     reward = model.predict(feature_vector)
-        #     q_value_table.append(reward)
-        q_value_table = tuple(self._return_reward_given_decision_state((state, decision), model) for decision in all_possible_decisions)
-        return q_value_table
-
-    # TODO This may belong outside bandit
-    def return_decision_with_max_reward(self, q_value_table):
-        max_value = max(q_value_table)
-        max_index = q_value_table.index(max_value)
-        # q_value_table.sort(key=lambda tup: tup[1], reverse=True)
-        return max_value, max_index
-
-    def return_action_based_on_greedy_policy(self, state, model, all_possible_decisions):
-
-        result = ()
-        q_value_table = self.return_decision_reward_tuples(state, model, all_possible_decisions)
-        # Store policy learned so far
-        if q_value_table:
-            max_value, max_index = self.return_decision_with_max_reward(q_value_table)
-            result = (all_possible_decisions[max_index], max_value)
-
-        return result
-
-    def select_decision_given_state(self, state, all_possible_decisions, model=None, algorithm='random', test=False):
-
-        rnd = random.random()
-        if algorithm == 'random' or not getattr(model, 'exists', None) or (
-                    algorithm == 'epsilon-greedy' and rnd < self.params and not test) or not state:
-            try:
-                result = (random.choice(all_possible_decisions), 0)
-            except:
-                result = (all_possible_decisions.sample(), 0)
-
-        elif test or (algorithm == 'epsilon-greedy' and rnd >= self.params and state):
-            result = self.return_action_based_on_greedy_policy(state, model, all_possible_decisions)
-
-            # Probably no need to save policy (for environments other than blackjack)
-            # self.policy[state] = [state[0], state[1], best_known_decision, max_reward]
-
-        best_known_decision, max_reward = result
-        return best_known_decision, max_reward
-
-    def decrement_epsilon(self, epochs):
-        if self.params > 0.1:
-            self.params -= (1.0 / 20000)

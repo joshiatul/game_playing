@@ -1,11 +1,11 @@
 import random
 from collections import namedtuple
-from . import game
+from . import environment
 import os
 
 # TODO Resolve for information <===> state.. unneccessary confusion
 
-class BlackJack(game.AbstractGame):
+class BlackJack(environment.AbstractGame):
 
     def __init__(self):
         self.action_space = ['hit', 'stay']
