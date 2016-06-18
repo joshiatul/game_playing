@@ -130,6 +130,7 @@ class RLAgent(object):
 
                 observation, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
                 new_state = env.preprocess(observation)
+                cumu_reward = env.clip_reward(cumu_reward, done)
                 total_reward += cumu_reward
                 td_error = cumu_reward - known_reward
 
@@ -167,8 +168,8 @@ class RLAgent(object):
             minibatch = self.experience_replay_obs.return_minibatch()
 
             # Now for each gameplay experience, update current reward based on the future reward (using action given by the model)
-            for index in minibatch:
-                old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er, td_error_er = self.experience_replay_obs.experience_replay[index]
+            for idx, index in enumerate(minibatch):
+                old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er, td_error_er = self.experience_replay_obs.return_minibatch_sample(index, count=idx)
 
                 # If game hasn't finished OR if no model then we have to update the reward based on future discounted reward
                 if not done_er and self.model.exists:  # non-terminal state
@@ -182,8 +183,9 @@ class RLAgent(object):
                 else:
                     reward_er_n = reward_er
 
-                self.experience_replay_obs.experience_replay[index] = (
-                old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er, abs(td_error_er))
+                # TODO Update TD error if we want any form of prioritized replay
+                # self.experience_replay_obs.experience_replay[index] = (
+                # old_state_er, action_er, reward_er, new_state_er, done_er, episode_er, move_er, abs(td_error_er))
                 # Design matrix is based on estimate of reward at state,action step t+1
                 # TODO Use absolute reward as weight may be (or may be some arbitrary scaling of it)
                 weight_er = 1
@@ -239,38 +241,53 @@ class ExperienceReplay(object):
         self.minibatch_method = minibatch_method
         self.experience_replay = None
         self.batchsize = batchsize
-        self.initialize()
         self.all_indices = range(experience_replay_size)
         # For stratified sampling
-        self.positive_batchsize = int(self.batchsize * 0.05)
+        self.positive_batchsize = int(self.batchsize * 0.1)
         self.negative_batchsize = self.batchsize - self.positive_batchsize
+        self.experience_replay_positive = None
+        self.experience_replay_negative = None
+        self.positive_indices = range(int(experience_replay_size*0.1))
+        self.negative_indices = range(int(experience_replay_size*(1-0.1)))
+        self.max_positive_idx = None
+        self.initialize()
 
     def initialize(self):
         if self.type == 'deque':
             self.experience_replay = deque(maxlen=self.experience_replay_size)
+            pos_size = int(self.experience_replay_size*0.1)
+            self.experience_replay_positive = deque(maxlen=pos_size)
+            neg_size = self.experience_replay_size - pos_size
+            self.experience_replay_negative = deque(maxlen=neg_size)
 
-        elif self.type == 'dict':
-            # {(episode, move): state_action_reward_tuple}
-            self.experience_replay = OrderedDict()
+        # elif self.type == 'dict':
+        #     # {(episode, move): state_action_reward_tuple}
+        #     self.experience_replay = OrderedDict()
 
     def store_for_experience_replay(self, state_tuple, episode_move_key=None):
         old_state, best_known_decision, cumu_reward, new_state, done, episode, move, td_error = state_tuple
         if old_state and new_state:
             if self.type == 'deque':
-                self.experience_replay.appendleft(state_tuple)
+                if self.minibatch_method != 'stratified':
+                    self.experience_replay.appendleft(state_tuple)
+                else:
+                    if cumu_reward > 0:
+                        self.experience_replay_positive.appendleft(state_tuple)
+                    else:
+                        self.experience_replay_negative.appendleft(state_tuple)
 
-            elif self.type == 'dict' and episode_move_key:
-                if len(self.experience_replay) == self.experience_replay_size:
-                    _ = self.experience_replay.popitem(last=False)
-                self.experience_replay[episode_move_key] = state_tuple
+            # elif self.type == 'dict' and episode_move_key:
+            #     if len(self.experience_replay) == self.experience_replay_size:
+            #         _ = self.experience_replay.popitem(last=False)
+            #     self.experience_replay[episode_move_key] = state_tuple
 
     def return_minibatch(self):
         if self.minibatch_method == 'random':
             if self.type == 'deque':
                 minibatch_indices = random.sample(self.all_indices, self.batchsize)
 
-            elif self.type == 'dict':
-                minibatch_indices = random.sample(self.experience_replay.keys(), self.batchsize)
+            # elif self.type == 'dict':
+            #     minibatch_indices = random.sample(self.experience_replay.keys(), self.batchsize)
 
         # Only work with deque type
         elif self.minibatch_method == 'prioritized':
@@ -279,39 +296,46 @@ class ExperienceReplay(object):
             probs = tuple((max(abs(st[7]), (1.0 / self.experience_replay_size)) * 1.0 / total_reward_in_ex_replay for st in self.experience_replay))
             minibatch_indices = list(np.random.choice(self.all_indices, self.batchsize, probs))
 
-            # Add small % of positive examples to balance things out?
-            # positive_reward_indices = tuple((idx for idx, st in enumerate(self.experience_replay) if st[2] > 0))
-            # if len(positive_reward_indices) > 0:
-            #     if len(positive_reward_indices) >= self.positive_batchsize:
-            #         positive_minibatch_indices = random.sample(positive_reward_indices, self.positive_batchsize)
-            #     else:
-            #         positive_minibatch_indices = list(positive_reward_indices)
-            #     minibatch_indices += positive_minibatch_indices
-
         # Only work with deque type
         elif self.minibatch_method == 'stratified':
-            positive_reward_indices = tuple((idx for idx, st in enumerate(self.experience_replay) if st[2] > 0))
-            negative_minibatch_indices = random.sample(self.all_indices, self.negative_batchsize)
-            if len(positive_reward_indices) > 0:
-                if len(positive_reward_indices) >= self.positive_batchsize:
-                    positive_minibatch_indices = random.sample(positive_reward_indices, self.positive_batchsize)
-                else:
-                    positive_minibatch_indices = list(positive_reward_indices)
-                minibatch_indices = negative_minibatch_indices + positive_minibatch_indices
-
+            if len(self.experience_replay_positive) >= self.positive_batchsize:
+                minibatch_indices_positive = random.sample(self.positive_indices, self.positive_batchsize)
             else:
-                minibatch_indices = negative_minibatch_indices
+                minibatch_indices_positive = self.positive_indices
+            minibatch_indices_negative = random.sample(self.negative_indices, self.negative_batchsize)
+            # First positive indices and then negative indices - keep track of this
+            minibatch_indices = minibatch_indices_positive + minibatch_indices_negative
+            self.max_positive_idx = len(minibatch_indices_positive)
 
         return minibatch_indices
+
+    def return_minibatch_sample(self, index, count=None):
+        if self.minibatch_method == 'random' or self.minibatch_method == 'prioritized':
+            result =  self.experience_replay[index]
+
+        elif self.minibatch_method == 'stratified':
+            try:
+                if count < self.max_positive_idx:
+                    result = self.experience_replay_positive[index]
+                else:
+                    result =  self.experience_replay_negative[index]
+            except Exception as e:
+                print e
+
+        return result
+
 
     def start_training(self):
         """
         Start training only if experience replay memory is full
         """
-        if len(self.experience_replay) < self.experience_replay_size:
-            return False
-        else:
-            return True
+        if self.minibatch_method == 'random' or self.minibatch_method == 'prioritized':
+            start = False if len(self.experience_replay) < self.experience_replay_size else True
+
+        elif self.minibatch_method == 'stratified':
+            start = False if len(self.experience_replay_positive) + len(self.experience_replay_negative) < self.experience_replay_size else True
+
+        return start
 
 
 class Statistics(object):

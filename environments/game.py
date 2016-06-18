@@ -59,3 +59,11 @@ class AbstractGame(object):
             return
 
 
+    def clip_reward(self, reward, done):
+        if reward > 0:
+            reward = 20
+        elif reward <= 0 and done:
+            reward = -20
+        elif reward <= 0 and not done:
+            reward = -1
+        return reward

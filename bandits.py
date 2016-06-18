@@ -73,4 +73,4 @@ class BanditAlgorithm(object):
 
     def decrement_epsilon(self, epochs):
         if self.params > 0.1:
-            self.params -= (1.0 / epochs)
+            self.params -= (1.0 / 10000)

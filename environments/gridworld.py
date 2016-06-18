@@ -157,7 +157,7 @@ class GridWorld(game.AbstractGame):
     def get_reward(self):
         if self.player_info == self.pit_info:
             self.game_status = 'player loses'
-            return -20
+            return 0
         elif self.player_info == self.win_info:
             self.game_status = 'player wins'
             return 20
@@ -166,7 +166,7 @@ class GridWorld(game.AbstractGame):
         else:
             # Return distance from win (player looks at screen so i think this is fair)
             #return -(math.sqrt((self.player_info.x - self.win_info.x) ** 2 + (self.player_info.y - self.win_info.y) ** 2))
-            return -1
+            return 0
 
     def preprocess(self, observation):
         # No preprocessing for gridworld
