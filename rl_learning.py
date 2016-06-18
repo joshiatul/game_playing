@@ -243,19 +243,20 @@ class ExperienceReplay(object):
         self.batchsize = batchsize
         self.all_indices = range(experience_replay_size)
         # For stratified sampling
-        self.positive_batchsize = int(self.batchsize * 0.1)
+        self.positive_sample_fraction = 0.1
+        self.positive_batchsize = int(self.batchsize * self.positive_sample_fraction)
         self.negative_batchsize = self.batchsize - self.positive_batchsize
         self.experience_replay_positive = None
         self.experience_replay_negative = None
-        self.positive_indices = range(int(experience_replay_size*0.1))
-        self.negative_indices = range(int(experience_replay_size*(1-0.1)))
+        self.positive_indices = range(int(experience_replay_size*self.positive_sample_fraction))
+        self.negative_indices = range(int(experience_replay_size*(1-self.positive_sample_fraction)))
         self.max_positive_idx = None
         self.initialize()
 
     def initialize(self):
         if self.type == 'deque':
             self.experience_replay = deque(maxlen=self.experience_replay_size)
-            pos_size = int(self.experience_replay_size*0.1)
+            pos_size = int(self.experience_replay_size*self.positive_sample_fraction)
             self.experience_replay_positive = deque(maxlen=pos_size)
             neg_size = self.experience_replay_size - pos_size
             self.experience_replay_negative = deque(maxlen=neg_size)
