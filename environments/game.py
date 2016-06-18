@@ -38,16 +38,17 @@ class AbstractGame(object):
         # crop to capture playing area
         observation = observation[35:195]
         # grayscale
+        # I = I[::2,::2,0] # downsample by factor of 2 and kill rgb
         grayscale_obs = observation.mean(axis=2)
         # resize
-        resized_grayscale_obs = misc.imresize(grayscale_obs, (80, 80))
+        resized_grayscale_obs = misc.imresize(grayscale_obs, (40, 40))
         # new-old
         if len(self.old_preprocessed_screen) > 0:
             screen_delta = resized_grayscale_obs - self.old_preprocessed_screen
             # Store as old screen
             self.old_preprocessed_screen = resized_grayscale_obs
             # flatten
-            screen_delta = screen_delta.flatten()
+            screen_delta = screen_delta.ravel()
             # return non-zero pixels as preprocessed screen
             screen_delta = np.nonzero(screen_delta)[0]
             screen_delta = [str(i) for i in screen_delta]

@@ -128,10 +128,10 @@ class RLAgent(object):
                 best_known_decision, known_reward = self.bandit_algorithm.select_decision_given_state(current_state, env.action_space, self.model,
                                                                                                  algorithm='epsilon-greedy', test=not train)
 
-                observation, cumu_reward, done, info = env.step(best_known_decision, self.skip_frames)
+                observation, reward, done, info = env.step(best_known_decision, self.skip_frames)
                 new_state = env.preprocess(observation)
-                cumu_reward = env.clip_reward(cumu_reward, done)
-                total_reward += cumu_reward
+                cumu_reward = env.clip_reward(reward, done)
+                total_reward += reward
                 td_error = cumu_reward - known_reward
 
                 if train:
