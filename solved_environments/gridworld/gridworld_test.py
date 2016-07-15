@@ -6,13 +6,13 @@ def train_rl_agent(env_name, train=True):
     memory_structure_params = {'actor_critic_method': False}
     # memory_structure_params = {'experience_replay_size': 40, 'batchsize': 20, 'minibatch_method': 'random'}
     rl_params = {'memory_structure': memory_structure, 'memory_structure_params': memory_structure_params, 'gamma': 0.99, 'max_steps': 30,
-                 'n_steps_ahead': 3}
+                 'n_steps_ahead': 4}
     model_params = {'class': 'vw_python', 'loss_function': 'squared',
-                    'l2': 0.0000000001, 'lrq': 'se7', 'b': 20, 'l': 1}
+                    'l2': 0.000000001, 'lrq': 'sd4', 'b': 27, 'l': 1}
     bandit_params = {'start_epsilon': 0.9, 'anneal_epsilon_timesteps': 4000}
 
     if train:
-        rl.train_with_threads(env_name, rl_params, bandit_params, model_params, num_of_threads=8, epochs=10000, train=True,
+        rl.train_with_threads(env_name, rl_params, bandit_params, model_params, num_of_threads=4, epochs=8000, train=True,
                               display_state=False, use_processes=False)
     else:
         stat = rl.test_trained_model_with_random_play(env_name, test_games=100, render=False)

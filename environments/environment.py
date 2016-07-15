@@ -5,21 +5,30 @@ import numpy as np
 from collections import deque
 
 class Environment(object):
-    def __init__(self, name, width=None, height=None, last_n=None, delta_preprocessing=False):
+    def __init__(self, name, grid_size=None, last_n=None, delta_preprocessing=False):
         # self.base_folder_name = os.path.dirname(os.path.realpath(__file__)).replace('environments', 'solved_environments') + '/' + name
         # # TODO simplfy for all atari games
+        self.name = name
         if name == 'breakout':
             self.env = gym.make('Breakout-v0')
         elif name == 'pong':
             self.env = gym.make('Pong-v0')
+        elif name == 'gridworld':
+            pass
+        else:
+            self.env = gym.make(name)
 
         # gym returns 6 possible actions for breakout and pong.
         # I think only 3 are used for both. So making life easier
         # with "LEFT", "RIGHT", "NOOP" actions space.
         if name in {'breakout', 'pong'}:
-            self.action_space = [1, 2, 3]
+            self.action_space = [2, 3]
+        elif name == 'gridworld':
+            pass
+        else:
+            self.action_space = self.env.action_space
 
-        self.resize = (width, height)
+        self.resize = tuple(grid_size)
         self.history_length = last_n
         self.history = deque(maxlen=last_n)
         self.old_preprocessed_screen = []
@@ -30,12 +39,17 @@ class Environment(object):
         This should set the initial state
         """
         observation = self.env.reset()
-        current_state = self.preprocess(observation)
+        preprocessed_observation = self.preprocess(observation)
         self.history.clear()
-        # for _ in xrange(self.history_length):
-        #     if not self.delta_preprocessing:
-        #         self.history.appendleft(preprocessed_observation)
-        return current_state
+        if self.delta_preprocessing:
+            observation, reward, done, info = self.env.step(np.random.choice(self.action_space))
+            preprocessed_observation = self.preprocess(observation)
+
+        for _ in xrange(self.history_length):
+            self.history.append(preprocessed_observation)
+        state = [str(frame_num) + "_" + str(pixel) for frame_num, frame in enumerate(self.history) for pixel in frame]
+
+        return state
 
     def complete_one_episode(self):
         """
@@ -52,15 +66,16 @@ class Environment(object):
         if len(self.history) == self.history_length:
             observation, reward, done, info = self.env.step(action)
             preprocessed_observation = self.preprocess(observation)
-            self.history.appendleft(preprocessed_observation)
+            self.history.append(preprocessed_observation)
 
         elif len(self.history) < self.history_length:
             while len(self.history) < self.history_length:
                 observation, reward, done, info = self.env.step(action)
                 preprocessed_observation = self.preprocess(observation)
-                self.history.appendleft(preprocessed_observation)
+                self.history.append(preprocessed_observation)
 
-        state = np.hstack(self.history)
+        state = [str(frame_num) + "_" + str(pixel) for frame_num, frame in enumerate(self.history) for pixel in frame]
+        # state = np.hstack(self.history)
         return state, reward, done, info
 
     def render(self):
@@ -68,34 +83,42 @@ class Environment(object):
 
     # --------- Methods for Atari Games --------- #
     def preprocess(self, observation):
-        # crop to capture playing area (for breakout and pong)
-        observation = observation[35:195]
-        # grayscale
-        # I = I[::2,::2,0] # downsample by factor of 2 and kill rgb
-        grayscale_obs = observation.mean(axis=2)
-        # resize
-        resized_grayscale_obs = misc.imresize(grayscale_obs, self.resize)
+        if self.name in {'breakout'}:
+            t1 = observation[95:195].mean(axis=2)[::3, ::3]
+            t1[t1 == 142] = 0 # Kill border
+            t1[t1 == 118] = 0 # Kill background
 
-        preprocessed = resized_grayscale_obs.ravel()
+        elif self.name == 'pong':
+            t1 = observation[35:195]  # crop
+            t1 = t1[::3, ::3, 0]  # downsample by factor of 3
+            t1[t1 == 144] = 0  # erase background (background type 1)
+            t1[t1 == 109] = 0  # erase background (background type 2)
 
-        if self.delta_preprocessing and len(self.old_preprocessed_screen) > 0:
-            resized_grayscale_obs = preprocessed - self.old_preprocessed_screen
-            # Return only non-zero pixels for binary sparse features
-            resized_grayscale_obs = np.nonzero(resized_grayscale_obs.ravel())[0]
-
-            # Stringyfy
-            resized_grayscale_obs = [str(i) for i in resized_grayscale_obs]
         else:
-            resized_grayscale_obs = []
+            # crop, grayscale and downsample
+            t1 = misc.imresize(observation[35:195].mean(axis=2), self.resize, interp='bilinear')
 
-        self.old_preprocessed_screen = preprocessed
-        return resized_grayscale_obs
+        if self.delta_preprocessing:
+            if len(self.old_preprocessed_screen) == 0:
+                preprocessed = []
+            else:
+                resized_grayscale_obs = t1 - self.old_preprocessed_screen
+                # Return only non-zero pixels for binary sparse features
+                preprocessed = np.nonzero(resized_grayscale_obs.ravel())[0]
+            self.old_preprocessed_screen = t1
+
+        else:
+            preprocessed = np.nonzero(t1.ravel())[0]
+
+        return preprocessed
 
     def clip_reward(self, reward, done):
-        if reward > 0:
-            reward = 20
-        elif reward <= 0 and done:
-            reward = -20
-        elif reward <= 0 and not done:
-            reward = -1
+        # Do not clip reward for gridworld
+        if self.name == 'gridworld':
+            return reward
+        else:
+            if reward > 0:
+                reward = 10
+            elif reward < 0:
+                reward = -10
         return reward

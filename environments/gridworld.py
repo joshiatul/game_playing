@@ -11,9 +11,9 @@ def flatten_list_of_lists(list_of_lists):
 
 
 class GridWorld(environment.Environment):
-    def __init__(self):
+    def __init__(self, grid_size):
 
-        super(GridWorld, self).__init__('gridworld')
+        super(GridWorld, self).__init__(name='gridworld', grid_size=grid_size)
         self.action_space = ['up', 'down', 'left', 'right']
         self.all_decisions = ['up', 'down', 'left', 'right']
 
@@ -27,7 +27,7 @@ class GridWorld(environment.Environment):
         coordinates = namedtuple('coordinates', ['x', 'y'])
         self.coordinates = coordinates
         self.all_used_coordinates = {'x': set(), 'y': set()}
-        self.size = 4
+        self.size = grid_size[0] # Assuming square grid for now
 
 
     def reset(self, full_rnd=True):
@@ -116,16 +116,12 @@ class GridWorld(environment.Environment):
     def get_reward(self):
         if self.player_info == self.pit_info:
             self.game_status = 'player loses'
-            return 0
+            return -10
         elif self.player_info == self.win_info:
             self.game_status = 'player wins'
-            return 20
-        # elif self.player_info == self.player_old_state:
-        #     return -10
+            return 10
         else:
-            # Return distance from win (player looks at screen so i think this is fair)
-            #return -(math.sqrt((self.player_info.x - self.win_info.x) ** 2 + (self.player_info.y - self.win_info.y) ** 2))
-            return 0
+            return -1
 
     def preprocess(self, observation):
         # No preprocessing for gridworld

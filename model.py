@@ -1,18 +1,8 @@
-from sklearn.linear_model import SGDRegressor, SGDClassifier
-from sklearn.feature_extraction import FeatureHasher
-import numpy as np
 import bandits as bandit
-from subprocess import Popen, PIPE, STDOUT
-import os
-from tempfile import NamedTemporaryFile
-import sys
-from vowpal_wabbit import pyvw
-import random
+from vowpalwabbit import pyvw
 import cPickle as pickle
-import hashlib
 import mmh3
 
-# TODO Pass learning rate
 
 """
 All models get implemented here
@@ -39,6 +29,10 @@ class Model(object):
 
     def return_model_class(self):
         return self.model_class
+
+    def save_and_continue(self):
+        self.actor_model.finish()
+        self.actor_model = pyvw.vw("--quiet -i {0}".format(self.actor_model_path))
 
     def finish(self):
         "Let's pickle only if we are running vw"
@@ -99,16 +93,19 @@ class Model(object):
             state, decision_taken = decision_state
             # Right now features are simply state X decision interaction + single interaction feature representing state and action
             # Features are simply pixel-action interactions
-            all_features = [obs + '-' + str(decision_taken) for obs in state] if not critic_model else [obs for obs in state]
-            tag = '_'.join(all_features)
-            tag = str(mmh3.hash128(tag))
-            all_features_with_interaction = all_features + [tag]
+            # all_features = [obs + '-' + str(decision_taken) for obs in state] if not critic_model else [obs for obs in state]
+            # tag = '_'.join(all_features)
+            # tag = "tag_" + str(mmh3.hash64(tag))
+            # all_features_with_interaction = all_features + [tag]
 
-            input = " ".join(all_features_with_interaction)
-            input_str = " |sd " + input + '\n'
+            state_namespace = "|state " + " ".join(state) + " " +  "tag_" + str(mmh3.hash64("_".join(state)))
+            decision_namespace = "|decision " + "action_" + str(decision_taken)
+            # interaction_namespace = " |interaction " + " ".join(all_features_with_interaction)
+            input_str = state_namespace + " " +  decision_namespace + '\n'
 
             # Do this after cache retrieval
             if reward:
+                #weight = 10 if abs(reward) > 5 else 1
                 output = str(reward) + " " + str(weight)
                 fv = output + input_str
             else:

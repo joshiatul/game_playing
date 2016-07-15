@@ -5,7 +5,6 @@ import time
 import cPickle as pickle
 from collections import Counter, deque
 import numpy as np
-from collections import OrderedDict
 import os
 from environments.environment import Environment
 import threading
@@ -85,15 +84,14 @@ def train_reinforcement_learning_strategy(num_sims=1, game_obs='blackjack', mode
     #                 self.model.X.append(X_new)
     #                 self.model.y.append(y_new)
 
-def play_with_environment(name, model, statistics, rl_params, bandit_params, epochs, thread_id=1, train=True, display_state=False):
+def play_with_environment(environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id=1, train=True, display_state=False):
     """
     Simple temporal difference learning
     with experience-replay
     :return:
     """
-    env = make_environment(name)
+    env = make_environment(environment_params)
     epsilon = bandit_params.get('start_epsilon', 0.9)
-    start_epsilon = epsilon
     end_epsilon = bandits.sample_end_epsilon()
     model_class = 'random' if not model else model.return_model_class()
     actor_critic_method = rl_params.get('memory_structure_params', {}).get('actor_critic_method', False)
@@ -105,7 +103,7 @@ def play_with_environment(name, model, statistics, rl_params, bandit_params, epo
                                                  minibatch_method=rl_params['memory_structure_params']['minibatch_method'])
 
     if train:
-        print "------ Starting thread: " + str(thread_id) + " with final epsilon ", epsilon
+        print "------ Starting thread: " + str(thread_id) + " with final epsilon ", end_epsilon
         time.sleep(3 * thread_id)
 
     for episode in xrange(1, epochs + 1):
@@ -119,7 +117,6 @@ def play_with_environment(name, model, statistics, rl_params, bandit_params, epo
 
         if train and model.if_exists() and not actor_critic_method:
             epsilon = bandits.decrement_epsilon(epochs, epsilon, bandit_params.get('anneal_epsilon_timesteps', 10000), end_epsilon)
-            start_epsilon = epsilon
 
         # Start playing the game
         for move in xrange(1, rl_params['max_steps'] + 1):
@@ -133,11 +130,12 @@ def play_with_environment(name, model, statistics, rl_params, bandit_params, epo
                 # Figure out best action based on policy
                 if not actor_critic_method:
                     action, max_q_value = bandits.select_action_with_epsilon_greedy_policy(current_state, env.action_space, model,
-                                                                                                        epsilon=start_epsilon, test=not train)
+                                                                                                        epsilon=epsilon, test=not train)
                 else:
                     action, max_q_value = bandits.return_action_based_on_softmax_policy(current_state, model, env.action_space)
 
                 # Take step / observe reward / preprocess / update counters
+                if not train and display_state: print "Taking action: #-----: " + str(action)
                 new_state, reward, done, info = env.step(action)
                 clipped_reward = env.clip_reward(reward, done)
                 episodic_rewards.append(clipped_reward)
@@ -146,9 +144,11 @@ def play_with_environment(name, model, statistics, rl_params, bandit_params, epo
                 td_error = clipped_reward - max_q_value
                 episodic_max_q += max_q_value
 
-                if done: break
                 # Update state
                 current_state = new_state
+
+                if done:
+                    break
 
             if train:
                 bootstrapped_reward = return_bootstrapped_reward(env, model, rl_params['gamma'], new_state, done, actor_critic_method)
@@ -180,9 +180,6 @@ def play_with_environment(name, model, statistics, rl_params, bandit_params, epo
                     model.fit(X_critic, y_critic, critic_model=True)
                     X_critic, y_critic = [], []
 
-                # Further reduce epsilon as the game progresses
-                start_epsilon = bandits.decrement_epsilon(epochs, start_epsilon, 1000, end_epsilon)
-
             # Check game status and break if you have a result (printing only makes sense for gridworld)
             if done:
                 if not train and display_state and clipped_reward > 0: print 'Player WINS!'
@@ -192,6 +189,11 @@ def play_with_environment(name, model, statistics, rl_params, bandit_params, epo
         # Record end of the episode statistics
         statistics.record_episodic_statistics(done, episode, move, clipped_reward, total_episodic_reward, episodic_max_q,
                                               epsilon=epsilon, train=train, model_class=model_class, thread_id=thread_id)
+
+        # if train:
+        #     if thread_id == 4 and episode % 2000 == 0 and episode != epochs:
+        #         print "Saving model and continuing------------------"
+        #         model.save_and_continue()
 
     if not train:
         statistics.calculate_summary_statistics(model)
@@ -392,12 +394,12 @@ class ModelManager(BaseManager):
     pass
 
 
-def train_with_threads(name, rl_params, bandit_params, model_params, epochs, num_of_threads, train=True, display_state=False, use_processes=False):
+def train_with_threads(environment_params, rl_params, bandit_params, model_params, epochs, num_of_threads, train=True, display_state=False, use_processes=False):
     start_time = time.time()
 
     # Initialize statistics and model here and pass it as an argument
     test = not train
-    model_params['base_folder_name'] = return_base_path(name)
+    model_params['base_folder_name'] = return_base_path(environment_params['env_name'])
     model_params['actor_critic_model'] = rl_params['memory_structure_params'].get('actor_critic_method', False)
     statistics = Statistics(base_folder_name=model_params['base_folder_name'], test=test)
 
@@ -405,7 +407,7 @@ def train_with_threads(name, rl_params, bandit_params, model_params, epochs, num
         model = Model(model_params)
         model.initialize(test)
         actor_learner_threads = [
-            threading.Thread(target=play_with_environment, args=(name, model, statistics, rl_params, bandit_params, epochs, thread_id, train, display_state)) for
+            threading.Thread(target=play_with_environment, args=(environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id, train, display_state)) for
             thread_id in xrange(1, num_of_threads + 1)]
 
     else:# Multiprocessing process
@@ -418,7 +420,7 @@ def train_with_threads(name, rl_params, bandit_params, model_params, epochs, num
         model = manager.Model(model_params)
         model.initialize(test)
         actor_learner_threads = [
-            multiprocessing.Process(target=play_with_environment, args=(name, model, statistics, rl_params, bandit_params, epochs, thread_id, train, display_state)) for
+            multiprocessing.Process(target=play_with_environment, args=(environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id, train, display_state)) for
             thread_id in xrange(1, num_of_threads + 1)]
 
     for t in actor_learner_threads:
@@ -439,28 +441,28 @@ def return_base_path(name):
     return directory
 
 
-def make_environment(name):
-    if name == 'gridworld':
+def make_environment(environment_params):
+    if environment_params['env_name'] == 'gridworld':
         from environments.gridworld import GridWorld
-        env = GridWorld()
+        env = GridWorld(environment_params['grid_size'])
     else:
-        env = Environment(name, width=40, height=40, last_n=4, delta_preprocessing=True)
+        env = Environment(environment_params['env_name'], grid_size=environment_params['grid_size'], last_n=environment_params['last_n'], delta_preprocessing=environment_params['delta_preprocessing'])
     return env
 
-def test_trained_model_with_random_play(name, test_games, render=False):
+def test_trained_model_with_random_play(environment_params, test_games, render=False):
     print "---------- Testing policy:-----------"
-    base_folder = return_base_path(name)
+    base_folder = return_base_path(environment_params['env_name'])
     model = pickle.load(open(base_folder + '/model_obs.pkl', mode='rb'))
     model.initialize(test=True)
     statistics = Statistics(base_folder_name=base_folder, test=True)
 
     # First test with trained model
     print "---------- Testing trained VW model -------"
-    play_with_environment(name, model, statistics, rl_params={'max_steps': 30}, bandit_params={}, epochs=test_games, train=False, display_state=render)
+    play_with_environment(environment_params, model, statistics, rl_params={'max_steps': 30}, bandit_params={}, epochs=test_games, train=False, display_state=render)
     # Now with random model
 
     print "---------- Testing Random model -----------"
     model = None
-    play_with_environment(name, model, statistics, rl_params={'max_steps': 30}, bandit_params={}, epochs=test_games, train=False, display_state=False)
+    play_with_environment(environment_params, model, statistics, rl_params={'max_steps': 30}, bandit_params={}, epochs=test_games, train=False, display_state=False)
 
     return statistics.result

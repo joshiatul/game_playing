@@ -65,7 +65,7 @@ def decrement_epsilon(epochs, epsilon, anneal_epsilon_timesteps, end_epsilon):
 
 
 def sample_end_epsilon():
-    return np.random.choice([0.1, 0.01, 0.5], p=[0.45, 0.45, 0.1])
+    return np.random.choice([0.1, 0.01, 0.5], p=[0.4, 0.3, 0.3])
 
 
 # ---- Methods For lookup table -----

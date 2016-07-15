@@ -1,0 +1,31 @@
+environment_params:
+  env_name: 'gridworld'
+  grid_size: [4, 4]
+
+rl_params:
+  memory_structure: 'asynchronous_methods'
+  memory_structure_params: {'actor_critic_method': False}
+  gamma: 0.99
+  max_steps: 30
+  n_steps_ahead: 1
+
+model_params:
+  class: 'vw_python'
+  loss_function: 'squared'
+  l2: 0.000000001
+  l: 1
+  b: 27
+  lrq: 'sd4'
+
+bandit_params:
+  start_epsilon: 0.9
+  anneal_epsilon_timesteps: 4000
+
+training_params:
+  epochs: 8000
+  use_processes: False
+  number_of_threads: 8
+
+testing_params:
+  test_games: 100
+  display_games: 2
