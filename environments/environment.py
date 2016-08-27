@@ -3,6 +3,7 @@ import os
 from scipy import misc
 import numpy as np
 from collections import deque
+import mmh3
 
 class Environment(object):
     def __init__(self, name, grid_size=None, last_n=None, delta_preprocessing=False):
@@ -31,7 +32,7 @@ class Environment(object):
         self.resize = tuple(grid_size)
         self.history_length = last_n
         self.history = deque(maxlen=last_n)
-        self.old_preprocessed_screen = []
+        self.prev_x = None
         self.delta_preprocessing = delta_preprocessing
 
     def reset(self):
@@ -39,17 +40,9 @@ class Environment(object):
         This should set the initial state
         """
         observation = self.env.reset()
-        preprocessed_observation = self.preprocess(observation)
-        self.history.clear()
-        if self.delta_preprocessing:
-            observation, reward, done, info = self.env.step(np.random.choice(self.action_space))
-            preprocessed_observation = self.preprocess(observation)
+        self.prev_x = None
 
-        for _ in xrange(self.history_length):
-            self.history.append(preprocessed_observation)
-        state = [str(frame_num) + "_" + str(pixel) for frame_num, frame in enumerate(self.history) for pixel in frame]
-
-        return state
+        return observation
 
     def complete_one_episode(self):
         """
@@ -63,20 +56,8 @@ class Environment(object):
         environment. Mostly used for temporal difference learning
         :return: <observation, reward, done, info>
         """
-        if len(self.history) == self.history_length:
-            observation, reward, done, info = self.env.step(action)
-            preprocessed_observation = self.preprocess(observation)
-            self.history.append(preprocessed_observation)
-
-        elif len(self.history) < self.history_length:
-            while len(self.history) < self.history_length:
-                observation, reward, done, info = self.env.step(action)
-                preprocessed_observation = self.preprocess(observation)
-                self.history.append(preprocessed_observation)
-
-        state = [str(frame_num) + "_" + str(pixel) for frame_num, frame in enumerate(self.history) for pixel in frame]
-        # state = np.hstack(self.history)
-        return state, reward, done, info
+        observation, reward, done, info = self.env.step(action)
+        return observation, reward, done, info
 
     def render(self):
         self.env.render()
@@ -87,30 +68,32 @@ class Environment(object):
             t1 = observation[95:195].mean(axis=2)[::3, ::3]
             t1[t1 == 142] = 0 # Kill border
             t1[t1 == 118] = 0 # Kill background
+            t1[t1 != 0] = 1  # everything else (paddles, ball) just set to 1
+            return t1.astype(np.float).ravel()
 
         elif self.name == 'pong':
             t1 = observation[35:195]  # crop
             t1 = t1[::3, ::3, 0]  # downsample by factor of 3
             t1[t1 == 144] = 0  # erase background (background type 1)
             t1[t1 == 109] = 0  # erase background (background type 2)
+            t1[t1 != 0] = 1  # everything else (paddles, ball) just set to 1
+            return t1.astype(np.float).ravel()
 
-        else:
-            # crop, grayscale and downsample
-            t1 = misc.imresize(observation[35:195].mean(axis=2), self.resize, interp='bilinear')
+    def sparsify(self, x):
+        sparse_x = np.nonzero(x)[0]
+        tag = str(mmh3.hash128("_".join('pix_' + str(i) for i in sparse_x)))
+        state = " |state " + " ".join('pix_' + str(i) for i in sparse_x)  + " tag_" + tag
+        return state
 
+    def preprocess_and_sparsify(self, observation):
+        cur_x = self.preprocess(observation)
         if self.delta_preprocessing:
-            if len(self.old_preprocessed_screen) == 0:
-                preprocessed = []
-            else:
-                resized_grayscale_obs = t1 - self.old_preprocessed_screen
-                # Return only non-zero pixels for binary sparse features
-                preprocessed = np.nonzero(resized_grayscale_obs.ravel())[0]
-            self.old_preprocessed_screen = t1
-
+            x = cur_x - self.prev_x if self.prev_x is not None else np.zeros(54*54)
+            self.prev_x = np.copy(cur_x)
+            sparse_x = self.sparsify(x)
         else:
-            preprocessed = np.nonzero(t1.ravel())[0]
-
-        return preprocessed
+            sparse_x = self.sparsify(cur_x)
+        return sparse_x
 
     def clip_reward(self, reward, done):
         # Do not clip reward for gridworld

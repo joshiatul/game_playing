@@ -15,14 +15,12 @@ class Model(object):
     def __init__(self, params):
         self.model_class = params['class']
         self.actor_model = {}
-        self.critic_model = {}
         self.all_possible_decisions = []
         self.base_folder_name = params['base_folder_name']
-        self.actor_model_design_matrix_cache = {}
-        self.critic_model_design_matrix_cache = {}
         self.exists = False
         self.params = params
-        self.critic_model_exists = params.get('actor_critic_model', False)
+        self.running_reward = None
+        self.epochs = 0
 
     def if_exists(self):
         return self.exists
@@ -30,9 +28,21 @@ class Model(object):
     def return_model_class(self):
         return self.model_class
 
-    def save_and_continue(self):
-        self.actor_model.finish()
-        self.actor_model = pyvw.vw("--quiet -i {0}".format(self.actor_model_path))
+    def increment_epochs(self):
+        self.epochs += 1
+
+    def compute_running_reward(self, episode, thread_id, clipped_reward, reward_sum, epsilon):
+        self.running_reward = reward_sum if self.running_reward is None else self.running_reward * 0.99 + reward_sum * 0.01
+        print "Episode(thread %d): %d  Total reward: %.4f    Running reward: %.4f   With epsilon: %.4f" % (thread_id, episode, clipped_reward,
+                                                                                                     self.running_reward, epsilon)
+    def save_and_continue(self, thread_id, event):
+        if self.epochs % 1000.0 == 0 and thread_id == 1:
+            event.clear()
+            print "saving model..."
+            print "epochs: " + str(self.epochs)
+            self.actor_model.finish()
+            self.actor_model = pyvw.vw("--quiet --save_resume -f {0} -i {1}".format(self.actor_model_path, self.actor_model_path))
+            event.set()
 
     def finish(self):
         "Let's pickle only if we are running vw"
@@ -41,33 +51,25 @@ class Model(object):
             # self.X = [ex.finish() for ex in self.X]
             self.actor_model.finish()
             self.actor_model = None
-            self.actor_model_design_matrix_cache = {}
-            if self.critic_model_exists:
-                self.critic_model.finish()
-                self.critic_model = None
-                self.critic_model_design_matrix_cache = {}
             with open(self.base_folder_name + '/model_obs.pkl', mode='wb') as model_file:
                 pickle.dump(self, model_file)
 
-    def initialize(self, test):
+    def initialize(self, test, resume=False):
         if self.model_class == 'lookup':
             self.actor_model = {}
 
         elif self.model_class == 'vw_python':
             self.actor_model_path = self.base_folder_name + "/model.vw"
-            self.critic_model_path = self.base_folder_name + "/model_critic.vw"
 
             if not test:
-                self.actor_model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True,
-                                           f=self.actor_model_path, b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'], k=True)
+                if not resume:
+                    self.actor_model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True,
+                                           f=self.actor_model_path, b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'], k=True, save_resume=True)
+                else:
+                    self.actor_model = pyvw.vw("--quiet --save_resume -f {0} -i {1}".format(self.actor_model_path, self.actor_model_path))
 
-                if self.critic_model_exists:
-                    self.critic_model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True,
-                                                f=self.critic_model_path, b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'], k=True)
             else:
                 self.actor_model = pyvw.vw("--quiet -i {0}".format(self.actor_model_path))
-                if self.critic_model_exists:
-                    self.critic_model = pyvw.vw("--quiet -i {0}".format(self.critic_model_path))
 
     def return_design_matrix(self, decision_state, reward=None, weight=1, critic_model=False):
         """
@@ -78,46 +80,17 @@ class Model(object):
             return decision_state, reward
 
         else:
-            # cache_key = str(mmh3.hash128(repr(decision_state)))
-            # cache_key = repr(decision_state)
-            # if not critic_model and cache_key in self.actor_model_design_matrix_cache:
-            #     input_str = self.actor_model_design_matrix_cache[cache_key]
-            #     # fv.set_label_string(str(reward) + " " + str(weight))
-            #     fv = str(reward) + " " + str(weight) + input_str if reward else input_str
-            #
-            # elif critic_model and cache_key in self.critic_model_design_matrix_cache:
-            #     input_str = self.critic_model_design_matrix_cache[cache_key]
-            #     fv = str(reward) + " " + str(weight) + input_str if reward else input_str
-            #
-            # else:
             state, decision_taken = decision_state
-            # Right now features are simply state X decision interaction + single interaction feature representing state and action
-            # Features are simply pixel-action interactions
-            # all_features = [obs + '-' + str(decision_taken) for obs in state] if not critic_model else [obs for obs in state]
-            # tag = '_'.join(all_features)
-            # tag = "tag_" + str(mmh3.hash64(tag))
-            # all_features_with_interaction = all_features + [tag]
-
-            state_namespace = "|state " + " ".join(state) + " " +  "tag_" + str(mmh3.hash64("_".join(state)))
-            decision_namespace = "|decision " + "action_" + str(decision_taken)
-            # interaction_namespace = " |interaction " + " ".join(all_features_with_interaction)
-            input_str = state_namespace + " " +  decision_namespace + '\n'
+            state_namespace = " |state " + " ".join(state) + " " +  "tag_" + str(mmh3.hash128("_".join(state)))
+            decision_namespace = " |decision " + "action_" + str(decision_taken)
+            input_str = state_namespace + decision_namespace + '\n'
 
             # Do this after cache retrieval
             if reward:
-                #weight = 10 if abs(reward) > 5 else 1
                 output = str(reward) + " " + str(weight)
                 fv = output + input_str
             else:
                 fv = input_str
-
-                #fv = self.model.example(fv)
-
-                # Store in cache
-                # if not critic_model:
-                #     self.actor_model_design_matrix_cache[cache_key] = input_str
-                # else:
-                #     self.critic_model_design_matrix_cache[cache_key] = input_str
 
             return fv, reward
 
@@ -142,8 +115,6 @@ class Model(object):
             # No need to invoke vw example object, just use lower level learn function
             if not critic_model:
                 res = [self.actor_model.learn(fv) for fv in X]
-            else:
-                res = [self.critic_model.learn(fv) for fv in X]
             self.exists = True
             # TODO Record loss sum(fv.get_loss()**2 for fv in X) / (len(X)*1.0)
             return
@@ -158,5 +129,5 @@ class Model(object):
         elif self.model_class == 'vw_python':
             # test.learn()  # Little wierd that we have to call learn at all for a prediction
             # res = test.get_simplelabel_prediction()
-            res = self.actor_model.predict(test) if not critic_model else self.critic_model.predict(test)
+            res = self.actor_model.predict(test)
             return res
