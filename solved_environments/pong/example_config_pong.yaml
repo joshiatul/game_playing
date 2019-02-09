@@ -16,18 +16,18 @@ model_params:
   loss_function: 'squared'
   l2: 0.0000001
   l: 0.15
-  b: 24
-  lrq: 'sd80'
-  resume: True
+  b: 27
+  lrq: 'sd100'
+  resume: False
 
 bandit_params:
   start_epsilon: 0.99
   anneal_epsilon_timesteps: 2000
 
 training_params:
-  epochs: 6000
-  use_processes: True
-  number_of_threads: 6
+  epochs: 2700
+  use_processes: False
+  number_of_threads: 8
 
 testing_params:
   test_games: 2

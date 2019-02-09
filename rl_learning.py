@@ -12,10 +12,12 @@ import multiprocessing
 from multiprocessing.managers import BaseManager
 from itertools import izip
 
+
 # http://stackoverflow.com/questions/26499548/accessing-an-attribute-of-a-multiprocessing-proxy-of-a-class
 # http://stackoverflow.com/questions/28612412/how-can-i-share-a-class-between-processes-in-python
 
-def play_with_environment(environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id=1, train=True, display_state=False):
+def play_with_environment(environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id=1,
+                          train=True, display_state=False):
     """
     Simple temporal difference learning
     with experience-replay
@@ -28,9 +30,12 @@ def play_with_environment(environment_params, model, statistics, rl_params, band
     X, y = [], []
 
     if train and rl_params.get('memory_structure', 'asynchronus_methods') == 'experience_replay':
-        experience_replay_obs = ExperienceReplay(type='deque', batchsize=rl_params['memory_structure_params']['batchsize'],
-                                                 experience_replay_size=rl_params['memory_structure_params']['experience_replay_size'],
-                                                 minibatch_method=rl_params['memory_structure_params']['minibatch_method'])
+        experience_replay_obs = ExperienceReplay(type='deque',
+                                                 batchsize=rl_params['memory_structure_params']['batchsize'],
+                                                 experience_replay_size=rl_params['memory_structure_params'][
+                                                     'experience_replay_size'],
+                                                 minibatch_method=rl_params['memory_structure_params'][
+                                                     'minibatch_method'])
 
     if train:
         print "------ Starting thread: " + str(thread_id) + " with final epsilon ", end_epsilon
@@ -46,7 +51,8 @@ def play_with_environment(environment_params, model, statistics, rl_params, band
         episodic_max_q = 0
 
         if train and model.if_exists():
-            epsilon = bandits.decrement_epsilon(epochs, epsilon, bandit_params.get('anneal_epsilon_timesteps', 10000), end_epsilon)
+            epsilon = bandits.decrement_epsilon(epochs, epsilon, bandit_params.get('anneal_epsilon_timesteps', 10000),
+                                                end_epsilon)
 
         # Start playing the game
         for move in xrange(1, rl_params['max_steps'] + 1):
@@ -58,8 +64,9 @@ def play_with_environment(environment_params, model, statistics, rl_params, band
             # Look n step ahead
             for _ in xrange(rl_params.get('n_steps_ahead', 1)):
                 # Figure out best action based on policy
-                action, max_q_value = bandits.select_action_with_epsilon_greedy_policy(current_state, env.action_space, model,
-                                                                                                        epsilon=epsilon, test=not train)
+                action, max_q_value = bandits.select_action_with_epsilon_greedy_policy(current_state, env.action_space,
+                                                                                       model,
+                                                                                       epsilon=epsilon, test=not train)
 
                 # Take step / observe reward / preprocess / update counters
                 if not train and display_state: print "Taking action: #-----: " + str(action)
@@ -80,15 +87,18 @@ def play_with_environment(environment_params, model, statistics, rl_params, band
             if train:
                 bootstrapped_reward = return_bootstrapped_reward(env, model, new_state, done)
 
-                for i in xrange(len(episodic_rewards)-1, -1, -1):
+                for i in xrange(len(episodic_rewards) - 1, -1, -1):
                     bootstrapped_reward = episodic_rewards[i] + rl_params['gamma'] * bootstrapped_reward
 
                     if rl_params['memory_structure'] == 'experience_replay':
-                        X, y = generate_training_samples_with_experience_replay(experience_replay_obs, env, model, X, y, episode_key=(episode, move),
+                        X, y = generate_training_samples_with_experience_replay(experience_replay_obs, env, model, X, y,
+                                                                                episode_key=(episode, move),
                                                                                 gamma=rl_params['gamma'],
                                                                                 state_tuple=(
-                                                                                states[i], action, bootstrapped_reward, new_state, done, episode,
-                                                                                move, td_error))
+                                                                                    states[i], action,
+                                                                                    bootstrapped_reward, new_state,
+                                                                                    done, episode,
+                                                                                    move, td_error))
 
                     else:
                         X_new, y_new = model.return_design_matrix((states[i], action), bootstrapped_reward, weight=1)
@@ -106,8 +116,10 @@ def play_with_environment(environment_params, model, statistics, rl_params, band
                 break
 
         # Record end of the episode statistics
-        statistics.record_episodic_statistics(done, episode, move, clipped_reward, total_episodic_reward, episodic_max_q,
-                                              epsilon=epsilon, train=train, model_class=model_class, thread_id=thread_id)
+        statistics.record_episodic_statistics(done, episode, move, clipped_reward, total_episodic_reward,
+                                              episodic_max_q,
+                                              epsilon=epsilon, train=train, model_class=model_class,
+                                              thread_id=thread_id)
 
         # if train:
         #     if thread_id == 4 and episode % 2000 == 0 and episode != epochs:
@@ -140,22 +152,24 @@ class Statistics(object):
         self.result = {}
         self.batch_mse_stat = []
 
-    def record_episodic_statistics(self, done, episode, total_moves, step_reward, total_episodic_reward, episodic_max_q, epsilon, train=True,
+    def record_episodic_statistics(self, done, episode, total_moves, step_reward, total_episodic_reward, episodic_max_q,
+                                   epsilon, train=True,
                                    model_class=None, thread_id=1):
         """
         For now record statistics only if episode is ended OR max steps are done
         """
-        avg_max_q = episodic_max_q*1.0 / total_moves
-        res_line = 'Game:{0}, total_steps:{1}, total_reward:{2}, final_reward:{3}, avg_q_value:{4}, epsilon:{5}, thread:{6}'.format(episode,
-                                                                                                                total_moves,
-                                                                                                                total_episodic_reward,
-                                                                                                                round(step_reward, 4),
-                                                                                                                round(avg_max_q),
-                                                                                                                round(epsilon, 4),
-                                                                                                                thread_id)
+        avg_max_q = episodic_max_q * 1.0 / total_moves
+        res_line = 'Episode:{0}, total_steps:{1}, total_reward:{2}, final_reward:{3}, avg_q_value:{4}, epsilon:{5}, thread:{6}'.format(
+            episode,
+            total_moves,
+            total_episodic_reward,
+            round(step_reward, 4),
+            round(episodic_max_q),
+            round(epsilon, 4),
+            thread_id)
         if train:
-            print res_line
-            self.result_file.write(res_line+"\n")
+            # print res_line
+            self.result_file.write(res_line + "\n")
 
         self.total_reward = total_episodic_reward
         self.total_episodes = episode
@@ -175,7 +189,8 @@ class Statistics(object):
     def calculate_summary_statistics(self, model_class=None):
         model_type = 'random' if not model_class else model_class
         if model_type in self.result:
-            self.result[model_type]['avgerage_reward_per_episode'] = round(self.total_reward * 1.0 / max(self.total_episodes, 1), 2)
+            self.result[model_type]['avgerage_reward_per_episode'] = round(
+                self.total_reward * 1.0 / max(self.total_episodes, 1), 2)
         self.total_reward = 0
         self.total_episodes = 0
         try:
@@ -183,11 +198,13 @@ class Statistics(object):
         except:
             pass
 
+
 class ModelManager(BaseManager):
     pass
 
 
-def train_with_threads(environment_params, rl_params, bandit_params, model_params, epochs, num_of_threads, train=True, display_state=False, use_processes=False):
+def train_with_threads(environment_params, rl_params, bandit_params, model_params, epochs, num_of_threads, train=True,
+                       display_state=False, use_processes=False):
     start_time = time.time()
 
     # Initialize statistics and model here and pass it as an argument
@@ -202,7 +219,9 @@ def train_with_threads(environment_params, rl_params, bandit_params, model_param
         model = Model(model_params)
         model.initialize(test, resume)
         actor_learner_threads = [
-            threading.Thread(target=play_with_environment_pong if env_name == 'atari' else play_with_environment, args=(environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id, train, display_state)) for
+            threading.Thread(target=play_with_environment_pong if env_name == 'atari' else play_with_environment, args=(
+            environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id, train, display_state))
+            for
             thread_id in xrange(1, num_of_threads + 1)]
 
     # Multiprocessing process
@@ -214,7 +233,10 @@ def train_with_threads(environment_params, rl_params, bandit_params, model_param
         model = manager.Model(model_params)
         model.initialize(test, resume)
         actor_learner_threads = [
-            multiprocessing.Process(target=play_with_environment_pong if env_name == 'atari' else play_with_environment, args=(environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id, train, display_state)) for
+            multiprocessing.Process(target=play_with_environment_pong if env_name == 'atari' else play_with_environment,
+                                    args=(
+                                    environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id,
+                                    train, display_state)) for
             thread_id in xrange(1, num_of_threads + 1)]
 
     for t in actor_learner_threads:
@@ -223,9 +245,9 @@ def train_with_threads(environment_params, rl_params, bandit_params, model_param
         t.join()
 
     if train: model.finish()
-    #statistics.calculate_summary_statistics(model.return_model_class())
+    # statistics.calculate_summary_statistics(model.return_model_class())
     print "elapsed time:" + str(int(time.time() - start_time))
-    #return statistics.result
+    # return statistics.result
 
 
 def return_base_path(name):
@@ -240,8 +262,11 @@ def make_environment(environment_params):
         from environments.gridworld import GridWorld
         env = GridWorld(environment_params['grid_size'])
     else:
-        env = Environment(environment_params['env_name'], grid_size=environment_params['grid_size'], last_n=environment_params['last_n'], delta_preprocessing=environment_params['delta_preprocessing'])
+        env = Environment(environment_params['env_name'], grid_size=environment_params['grid_size'],
+                          last_n=environment_params['last_n'],
+                          delta_preprocessing=environment_params['delta_preprocessing'])
     return env
+
 
 def test_trained_model_with_random_play(environment_params, test_games, render=False):
     print "---------- Testing policy:-----------"
@@ -253,24 +278,28 @@ def test_trained_model_with_random_play(environment_params, test_games, render=F
     # First test with trained model
     print "---------- Testing trained VW model -------"
     if environment_params['env_name'] == 'gridworld':
-        play_with_environment(environment_params, model, statistics, rl_params={'max_steps': 30}, bandit_params={}, epochs=test_games, train=False, display_state=render)
+        play_with_environment(environment_params, model, statistics, rl_params={'max_steps': 30}, bandit_params={},
+                              epochs=test_games, train=False, display_state=render)
     else:
-        play_with_environment_pong(environment_params, model, statistics, rl_params={}, bandit_params={'start_epsilon': 0.0}, epochs=test_games, thread_id=1, train=False,
-                                   display_state=render)
+        play_with_environment_pong(environment_params, model, statistics, rl_params={},
+                                   bandit_params={'start_epsilon': 0.0}, epochs=test_games, thread_id=8, train=False,
+                                   display_state=True)
 
     # Now with random model
     print "---------- Testing Random model -----------"
     model = None
     if environment_params['env_name'] == 'gridworld':
-        play_with_environment(environment_params, model, statistics, rl_params={'max_steps': 30}, bandit_params={}, epochs=test_games, train=False, display_state=False)
+        play_with_environment(environment_params, model, statistics, rl_params={'max_steps': 30}, bandit_params={},
+                              epochs=test_games, train=False, display_state=False)
     else:
-        play_with_environment_pong(environment_params, model, statistics, rl_params={}, bandit_params={}, epochs=test_games, thread_id=1, train=False,
+        play_with_environment_pong(environment_params, model, statistics, rl_params={}, bandit_params={},
+                                   epochs=test_games, thread_id=1, train=False,
                                    display_state=render)
 
     return statistics.result
 
 
-#------- Pong functions TEST ------------------------------------------------------
+# ------- Pong functions TEST ------------------------------------------------------
 def choose_action_greedy_policy(current_sparse_state, model, action_space):
     q_value_table = []
     for a in action_space:
@@ -281,7 +310,8 @@ def choose_action_greedy_policy(current_sparse_state, model, action_space):
     return action_space[max_index]
 
 
-def play_with_environment_pong(environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id, train=True, display_state=False):
+def play_with_environment_pong(environment_params, model, statistics, rl_params, bandit_params, epochs, thread_id,
+                               train=True, display_state=False):
     gamma = rl_params.get('gamma', 0.99)  # discount factor for reward
     model_trained = False if train or not model else True
     epsilon = bandit_params.get('start_epsilon', 0.5)
@@ -347,8 +377,16 @@ def play_with_environment_pong(environment_params, model, statistics, rl_params,
                     model.compute_running_reward(episode_number, thread_id, reward_sum, running_reward, epsilon)
                 else:
                     print 'Episode: %d resetting env. episode reward total was %f. running mean: %f' % (
-                    episode_number, reward_sum, running_reward)
+                        episode_number, reward_sum, running_reward)
+
+                statistics.record_episodic_statistics(done, episode=episode_number, total_moves=_,
+                                                      step_reward=reward_sum, total_episodic_reward=running_reward,
+                                                      episodic_max_q=running_reward,
+                                                      epsilon=epsilon, train=train, model_class='async',
+                                                      thread_id=thread_id)
+
                 break
+
 
 # -------------- Experience-replay Class and Methods --------------------------------------------------
 class ExperienceReplay(object):
@@ -365,15 +403,15 @@ class ExperienceReplay(object):
         self.negative_batchsize = self.batchsize - self.positive_batchsize
         self.experience_replay_positive = None
         self.experience_replay_negative = None
-        self.positive_indices = range(int(experience_replay_size*self.positive_sample_fraction))
-        self.negative_indices = range(int(experience_replay_size*(1-self.positive_sample_fraction)))
+        self.positive_indices = range(int(experience_replay_size * self.positive_sample_fraction))
+        self.negative_indices = range(int(experience_replay_size * (1 - self.positive_sample_fraction)))
         self.max_positive_idx = None
         self.initialize()
 
     def initialize(self):
         if self.type == 'deque':
             self.experience_replay = deque(maxlen=self.experience_replay_size)
-            pos_size = int(self.experience_replay_size*self.positive_sample_fraction)
+            pos_size = int(self.experience_replay_size * self.positive_sample_fraction)
             self.experience_replay_positive = deque(maxlen=pos_size)
             neg_size = self.experience_replay_size - pos_size
             self.experience_replay_negative = deque(maxlen=neg_size)
@@ -384,7 +422,7 @@ class ExperienceReplay(object):
 
     def store_for_experience_replay(self, state_tuple, episode_move_key=None):
         old_state, best_known_decision, cumu_reward, new_state, done, episode, move, td_error = state_tuple
-        if len(old_state)>0 and len(new_state)>0:
+        if len(old_state) > 0 and len(new_state) > 0:
             if self.type == 'deque':
                 if self.minibatch_method != 'stratified':
                     self.experience_replay.appendleft(state_tuple)
@@ -410,8 +448,11 @@ class ExperienceReplay(object):
         # Only work with deque type
         elif self.minibatch_method == 'prioritized':
             # Simple prioritization based on magnitude of reward
-            total_reward_in_ex_replay = sum(max(abs(st[7]), (1.0 / self.experience_replay_size)) for st in self.experience_replay)
-            probs = tuple((max(abs(st[7]), (1.0 / self.experience_replay_size)) * 1.0 / total_reward_in_ex_replay for st in self.experience_replay))
+            total_reward_in_ex_replay = sum(
+                max(abs(st[7]), (1.0 / self.experience_replay_size)) for st in self.experience_replay)
+            probs = tuple(
+                (max(abs(st[7]), (1.0 / self.experience_replay_size)) * 1.0 / total_reward_in_ex_replay for st in
+                 self.experience_replay))
             minibatch_indices = list(np.random.choice(self.all_indices, self.batchsize, probs))
 
         # Only work with deque type
@@ -429,19 +470,18 @@ class ExperienceReplay(object):
 
     def return_minibatch_sample(self, index, count=None):
         if self.minibatch_method == 'random' or self.minibatch_method == 'prioritized':
-            result =  self.experience_replay[index]
+            result = self.experience_replay[index]
 
         elif self.minibatch_method == 'stratified':
             try:
                 if count < self.max_positive_idx:
                     result = self.experience_replay_positive[index]
                 else:
-                    result =  self.experience_replay_negative[index]
+                    result = self.experience_replay_negative[index]
             except Exception as e:
                 print e
 
         return result
-
 
     def start_training(self):
         """
@@ -451,12 +491,14 @@ class ExperienceReplay(object):
             start = False if len(self.experience_replay) < self.experience_replay_size else True
 
         elif self.minibatch_method == 'stratified':
-            start = False if len(self.experience_replay_positive) + len(self.experience_replay_negative) < self.experience_replay_size else True
+            start = False if len(self.experience_replay_positive) + len(
+                self.experience_replay_negative) < self.experience_replay_size else True
 
         return start
 
 
-def generate_training_samples_with_experience_replay(experience_replay_obs, env, model, X, y, episode_key, gamma, state_tuple):
+def generate_training_samples_with_experience_replay(experience_replay_obs, env, model, X, y, episode_key, gamma,
+                                                     state_tuple):
     experience_replay_obs.store_for_experience_replay(state_tuple, episode_key)
 
     # Start training only after buffer is full

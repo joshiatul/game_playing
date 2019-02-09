@@ -63,13 +63,13 @@ class Model(object):
 
             if not test:
                 if not resume:
-                    self.actor_model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], passes=1, holdout_off=True,
-                                           f=self.actor_model_path, b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'], k=True, save_resume=True)
+                    self.actor_model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], holdout_off=True,
+                                           f=self.actor_model_path, b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'], k=True)
                 else:
                     self.actor_model = pyvw.vw("--quiet --save_resume -f {0} -i {1}".format(self.actor_model_path, self.actor_model_path))
 
             else:
-                self.actor_model = pyvw.vw("--quiet -i {0}".format(self.actor_model_path))
+                self.actor_model = pyvw.vw("--quiet -t -i {0}".format(self.actor_model_path))
 
     def return_design_matrix(self, decision_state, reward=None, weight=1, critic_model=False):
         """

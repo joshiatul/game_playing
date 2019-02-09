@@ -22,6 +22,7 @@ class Environment(object):
         # gym returns 6 possible actions for breakout and pong.
         # I think only 3 are used for both. So making life easier
         # with "LEFT", "RIGHT", "NOOP" actions space.
+        # env.unwrapped.get_action_meanings()
         if name in {'breakout', 'pong'}:
             self.action_space = [2, 3]
         elif name == 'gridworld':
@@ -65,7 +66,7 @@ class Environment(object):
     # --------- Methods for Atari Games --------- #
     def preprocess(self, observation):
         if self.name in {'breakout'}:
-            t1 = observation[95:195].mean(axis=2)[::3, ::3]
+            t1 = observation[95:195].mean(axis=2)[::2, ::2]
             t1[t1 == 142] = 0 # Kill border
             t1[t1 == 118] = 0 # Kill background
             t1[t1 != 0] = 1  # everything else (paddles, ball) just set to 1
@@ -73,7 +74,7 @@ class Environment(object):
 
         elif self.name == 'pong':
             t1 = observation[35:195]  # crop
-            t1 = t1[::3, ::3, 0]  # downsample by factor of 3
+            t1 = t1[::2, ::2, 0]  # downsample by factor of 2
             t1[t1 == 144] = 0  # erase background (background type 1)
             t1[t1 == 109] = 0  # erase background (background type 2)
             t1[t1 != 0] = 1  # everything else (paddles, ball) just set to 1
