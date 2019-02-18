@@ -66,7 +66,7 @@ class Model(object):
                     self.actor_model = pyvw.vw(quiet=True, l2=self.params['l2'], loss_function=self.params['loss_function'], holdout_off=True,
                                            f=self.actor_model_path, b=self.params['b'], lrq=self.params['lrq'], l=self.params['l'], k=True)
                 else:
-                    self.actor_model = pyvw.vw("--quiet --save_resume -f {0} -i {1}".format(self.actor_model_path, self.actor_model_path))
+                    self.actor_model = pyvw.vw("--quiet -f {0} -i {0}".format(self.actor_model_path))
 
             else:
                 self.actor_model = pyvw.vw("--quiet -t -i {0}".format(self.actor_model_path))

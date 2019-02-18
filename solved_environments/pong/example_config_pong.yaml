@@ -14,10 +14,10 @@ rl_params:
 model_params:
   class: 'vw_python'
   loss_function: 'squared'
-  l2: 0.0000001
+  l2: 0.00000001
   l: 0.15
-  b: 27
-  lrq: 'sd100'
+  b: 28
+  lrq: 'sd200'
   resume: False
 
 bandit_params:
@@ -25,10 +25,10 @@ bandit_params:
   anneal_epsilon_timesteps: 2000
 
 training_params:
-  epochs: 2700
+  epochs: 3000
   use_processes: False
   number_of_threads: 8
 
 testing_params:
-  test_games: 2
+  test_games: 1
   display_games: 0

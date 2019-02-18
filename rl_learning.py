@@ -315,11 +315,12 @@ def play_with_environment_pong(environment_params, model, statistics, rl_params,
     gamma = rl_params.get('gamma', 0.99)  # discount factor for reward
     model_trained = False if train or not model else True
     epsilon = bandit_params.get('start_epsilon', 0.5)
-    np.random.seed(thread_id)
+    np.random.seed(0)
     end_epsilon = bandits.sample_end_epsilon()
     anneal_epsilon_timesteps = bandit_params.get('anneal_epsilon_timesteps', 2000)
 
     env = make_environment(environment_params)
+    # env.env.seed(1)
     xs, drs, dm = [], [], []
     running_reward = None
 
@@ -329,7 +330,9 @@ def play_with_environment_pong(environment_params, model, statistics, rl_params,
         current_sparse_state = env.preprocess_and_sparsify(observation)
 
         for _ in xrange(10000):
-            if display_state: env.render()
+            if display_state:
+                time.sleep(0.01)
+                env.render()
 
             # Based on epsilon-greedy choose action
             if model_trained:
